@@ -97,7 +97,7 @@ train:
   
   # losses
   pixel_opt:
-    type: L1Loss
+    type: BackboneL2SSIMLoss
     loss_weight: 1
     reduction: mean
 

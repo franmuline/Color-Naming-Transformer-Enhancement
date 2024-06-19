@@ -2,6 +2,7 @@ import torch
 from torch import nn as nn
 from torch.nn import functional as F
 import numpy as np
+from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
 
 from basicsr.models.losses.loss_util import weighted_loss
 
@@ -120,3 +121,32 @@ class CharbonnierLoss(nn.Module):
         # loss = torch.sum(torch.sqrt(diff * diff + self.eps))
         loss = torch.mean(torch.sqrt((diff * diff) + (self.eps*self.eps)))
         return loss
+
+
+# *****************************************************************************
+# *                                                                           *
+# *             Code added by Francisco Antonio Molina Bakhos                 *
+# *                                                                           *
+# *****************************************************************************
+
+class BackboneL2SSIMLoss(nn.Module):
+    def __init__(self, loss_weight=1.0, reduction='mean', ssim_window_size=5, alpha=0.5):
+        super(BackboneL2SSIMLoss, self).__init__()
+        self.ssim_window_size = ssim_window_size
+        self.alpha = alpha
+        self.loss_weight = loss_weight
+        self.reduction = reduction
+
+        self.ssim_loss = SSIM(kernel_size=ssim_window_size).cuda()
+        self.l2_loss = nn.MSELoss()
+
+    def forward(self, prediction, target, backbone=None):
+        ssim_loss_pred = (1.0 - self.ssim_loss(prediction, target))
+        l2_loss_pred = self.l2_loss(prediction, target)
+        if backbone is None:
+            return self.loss_weight * (l2_loss_pred + ssim_loss_pred)
+        else:
+            l2_loss_backbone = self.l2_loss(backbone, target)
+
+            return self.loss_weight * (self.alpha*l2_loss_backbone + l2_loss_pred + ssim_loss_pred)
+
