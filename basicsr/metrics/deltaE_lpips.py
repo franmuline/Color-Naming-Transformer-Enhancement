@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import lpips
 from basicsr.metrics.metric_util import img_preprocessing
+import cv2
 
 
 def calculate_deltaEab(img1,
@@ -244,3 +245,20 @@ class LPIPS():
             img2 = img2 * 2 - 1
 
         return self.lpips(img1, img2)
+
+
+if __name__ == '__main__':
+    # Test the metrics
+    img1 = "/home/franmuline/Master_Workspace/TFM/Datasets/FiveK-UEGAN/input/a0001-jmac_DSC1459.png"
+    img2 = "/home/franmuline/Master_Workspace/TFM/Datasets/FiveK-UEGAN/input/a0001-jmac_DSC1459.png"
+
+    img1 = cv2.imread(img1)
+    img2 = cv2.imread(img2)
+
+    # Convert to (H, W, C) format
+    img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2RGB)
+    img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
+
+    print(f'deltaEab: {calculate_deltaEab(img1, img2, 0)}')
+    print(f'deltaE00: {calculate_deltaE00(img1, img2, 0)}')
+    print(f'LPIPS: {calculate_lpips(img1, img2, 0)}')
