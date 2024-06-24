@@ -10,6 +10,7 @@ from os import path as osp
 from basicsr.data import create_dataloader, create_dataset
 from basicsr.data.data_sampler import EnlargedSampler
 from basicsr.data.prefetch_dataloader import CPUPrefetcher, CUDAPrefetcher
+from basicsr.data.color_naming import ColorNaming
 from basicsr.models import create_model
 from basicsr.utils import (MessageLogger, check_resume, get_env_info,
                            get_root_logger, get_time_str, init_tb_logger,
@@ -163,6 +164,15 @@ def main():
         if opt['logger'].get('use_tb_logger') and 'debug' not in opt[
                 'name'] and opt['rank'] == 0:
             mkdir_and_rename(osp.join('tb_logger', opt['name']))
+
+    if 'color_naming' in opt:
+        num_categories = opt['color_naming'].get('num_categories', 6)
+        color_naming = ColorNaming(num_categories=num_categories)
+        opt['color_naming']['color_naming_instance'] = color_naming
+    else:
+        # Create a dummy instance to avoid NoneType error
+        opt['color_naming'] = {}
+        opt['color_naming']['color_naming_instance'] = None
 
     # initialize loggers
     logger, tb_logger = init_loggers(opt)
