@@ -201,10 +201,15 @@ class Restormer(nn.Module):
         ffn_expansion_factor = 2.66,
         bias = False,
         LayerNorm_type = 'WithBias',   ## Other option 'BiasFree'
-        dual_pixel_task = False        ## True for dual-pixel defocus deblurring only. Also set inp_channels=6
+        dual_pixel_task = False,       ## True for dual-pixel defocus deblurring only. Also set inp_channels=6
+        color_naming = False,          ## True for color naming task only. Also set inp_channels=9 (3 for RGB and 6 for color naming) or 14 (3 for RGB and 11 for color naming)
     ):
 
         super(Restormer, self).__init__()
+
+        # Code modification added by franmuline
+        self.color_naming = color_naming
+        # End of code modification
 
         self.patch_embed = OverlapPatchEmbed(inp_channels, dim)
 
@@ -278,7 +283,14 @@ class Restormer(nn.Module):
             out_dec_level1 = self.output(out_dec_level1)
         ###########################
         else:
-            out_dec_level1 = self.output(out_dec_level1) + inp_img
+            # Code modification added by franmuline
+            if not self.color_naming:
+                out_dec_level1 = self.output(out_dec_level1) + inp_img
+            else:
+                # If color_naming is True, we only add the first 3 channels of the input (RGB) to the output,
+                # getting rid of the color naming channels
+                out_dec_level1 = self.output(out_dec_level1) + inp_img[:,:3,:,:]
+            # End of code modification
 
 
         return out_dec_level1

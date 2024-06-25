@@ -62,6 +62,11 @@ class ImageCleanModel(BaseModel):
             use_identity     = self.opt['train']['mixing_augs'].get('use_identity', False)
             self.mixing_augmentation = Mixing_Augment(mixup_beta, use_identity, self.device)
 
+        # Code modification added by franmuline
+        if opt['color_naming']['color_naming_instance'] is not None:
+            opt['network_g']['color_naming'] = True
+        # End of code modification
+
         self.net_g = define_network(deepcopy(opt['network_g']))
         self.net_g = self.model_to_device(self.net_g)
         self.print_network(self.net_g)

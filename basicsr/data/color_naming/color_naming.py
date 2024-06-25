@@ -92,6 +92,9 @@ def create_custom_collate_fn(color_naming):
         # [B, 3 + num_categories, H, W]
         new_batch = {'lq': torch.cat([image_tensor, cn_images], dim=1),
                      'gt': torch.stack([element['gt'] for element in batch], dim=0)}
+        for key, value in batch[0].items():
+            if key not in ['lq', 'gt']:
+                new_batch[key] = [element[key] for element in batch]
         return new_batch
 
     return custom_collate_fn
