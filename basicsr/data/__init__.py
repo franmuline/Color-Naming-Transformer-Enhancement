@@ -7,6 +7,7 @@ from functools import partial
 from os import path as osp
 
 from basicsr.data.prefetch_dataloader import PrefetchDataLoader
+from basicsr.data.color_naming import create_custom_collate_fn
 from basicsr.utils import get_root_logger, scandir
 from basicsr.utils.dist_util import get_dist_info
 
@@ -58,7 +59,8 @@ def create_dataloader(dataset,
                       num_gpu=1,
                       dist=False,
                       sampler=None,
-                      seed=None):
+                      seed=None,
+                      color_naming=None):
     """Create dataloader.
 
     Args:
@@ -73,9 +75,16 @@ def create_dataloader(dataset,
             phase. Default: False.
         sampler (torch.utils.data.sampler): Data sampler. Default: None.
         seed (int | None): Seed. Default: None
+        color_naming (ColorNaming): ColorNaming class. Default: None.
     """
     phase = dataset_opt['phase']
     rank, _ = get_dist_info()
+    # Code modification to include color_naming from franmuline
+    collate_fn = None
+    if color_naming is not None:
+        collate_fn = create_custom_collate_fn(color_naming)
+    # End of code modification
+
     if phase == 'train':
         if dist:  # distributed training
             batch_size = dataset_opt['batch_size_per_gpu']
@@ -102,6 +111,10 @@ def create_dataloader(dataset,
     else:
         raise ValueError(f'Wrong dataset phase: {phase}. '
                          "Supported ones are 'train', 'val' and 'test'.")
+
+    # Code modification added from franmuline
+    dataloader_args['collate_fn'] = collate_fn
+    # End of code modification
 
     dataloader_args['pin_memory'] = dataset_opt.get('pin_memory', False)
 

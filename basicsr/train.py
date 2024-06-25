@@ -94,7 +94,9 @@ def create_train_val_dataloader(opt, logger):
                 num_gpu=opt['num_gpu'],
                 dist=opt['dist'],
                 sampler=train_sampler,
-                seed=opt['manual_seed'])
+                seed=opt['manual_seed'],
+                # Code modification for color naming
+                color_naming=opt['color_naming']['color_naming_instance'])
 
             num_iter_per_epoch = math.ceil(
                 len(train_set) * dataset_enlarge_ratio /
@@ -118,7 +120,9 @@ def create_train_val_dataloader(opt, logger):
                 num_gpu=opt['num_gpu'],
                 dist=opt['dist'],
                 sampler=None,
-                seed=opt['manual_seed'])
+                seed=opt['manual_seed'],
+                # Code modification for color naming
+                color_naming=opt['color_naming']['color_naming_instance'])
             logger.info(
                 f'Number of val images/folders in {dataset_opt["name"]}: '
                 f'{len(val_set)}')
@@ -165,14 +169,16 @@ def main():
                 'name'] and opt['rank'] == 0:
             mkdir_and_rename(osp.join('tb_logger', opt['name']))
 
+    # Code modification added by franmuline
     if 'color_naming' in opt:
         num_categories = opt['color_naming'].get('num_categories', 6)
-        color_naming = ColorNaming(num_categories=num_categories)
+        color_naming = ColorNaming(num_categories=num_categories, device='cpu')
         opt['color_naming']['color_naming_instance'] = color_naming
     else:
         # Create a dummy instance to avoid NoneType error
         opt['color_naming'] = {}
         opt['color_naming']['color_naming_instance'] = None
+    # End of code modification
 
     # initialize loggers
     logger, tb_logger = init_loggers(opt)

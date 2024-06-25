@@ -69,3 +69,29 @@ class ColorNaming():
             category_probs = torch.stack(category_probs, dim=0)
 
             return category_probs
+
+
+def create_custom_collate_fn(color_naming):
+    def custom_collate_fn(batch):
+        """Collate function to convert PIL images to color naming images.
+
+        Args:
+            batch: list of (image, label) tuples.
+
+        Returns:
+            torch.tensor: Color naming image.
+        """
+        images = [element['lq'] for element in batch]
+        image_tensor = torch.stack(images, dim=0)
+        cn_images = color_naming(image_tensor)
+        # Change order of dimensions, it returns [C, B, H, W], we want [B, C, H, W]
+        cn_images = cn_images.permute(1, 0, 2, 3)
+        # Transform cn_images to FloatTensor
+        cn_images = cn_images.float()
+        # Concatenate the color naming image to the input tensor so that the final output is
+        # [B, 3 + num_categories, H, W]
+        new_batch = {'lq': torch.cat([image_tensor, cn_images], dim=1),
+                     'gt': torch.stack([element['gt'] for element in batch], dim=0)}
+        return new_batch
+
+    return custom_collate_fn

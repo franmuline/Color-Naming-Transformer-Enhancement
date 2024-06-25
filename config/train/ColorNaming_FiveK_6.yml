@@ -51,7 +51,7 @@ datasets:
 # network structures
 network_g:
   type: Restormer
-  inp_channels: 3
+  inp_channels: 9
   out_channels: 3
   dim: 48
   num_blocks: [4,6,6,8]
@@ -147,4 +147,4 @@ dist_params:
 
 # color naming settings
 color_naming:
-  num_categories: 11
+  num_categories: 6
