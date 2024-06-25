@@ -249,8 +249,8 @@ class LPIPS():
 
 if __name__ == '__main__':
     # Test the metrics
-    img1 = "/home/franmuline/Master_Workspace/TFM/Datasets/FiveK-UEGAN/input/a0001-jmac_DSC1459.png"
-    img2 = "/home/franmuline/Master_Workspace/TFM/Datasets/FiveK-UEGAN/input/a0001-jmac_DSC1459.png"
+    img1 = "/home/franmuline/Master_Workspace/TFM/Datasets/FiveK/input/a0001-jmac_DSC1459.png"
+    img2 = "/home/franmuline/Master_Workspace/TFM/Datasets/FiveK/input/a0001-jmac_DSC1459.png"
 
     img1 = cv2.imread(img1)
     img2 = cv2.imread(img2)

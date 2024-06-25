@@ -10,8 +10,9 @@ datasets:
   test:
     name: TestSet
     type: Dataset_PairedImage
-    dataroot_gt: ../../Datasets/FiveK-UEGAN_partitioned/expertC_gt/test
-    dataroot_lq: ../../Datasets/FiveK-UEGAN_partitioned/input/test
+    dataroot_gt: ../../Datasets/FiveK/expertC_gt
+    dataroot_lq: ../../Datasets/FiveK/input
+    partitions: ../../Datasets/FiveK/UEGAN_partition
     io_backend:
       type: disk
 

@@ -72,6 +72,30 @@ class Dataset_PairedImage(data.Dataset):
                 [self.lq_folder, self.gt_folder], ['lq', 'gt'],
                 self.filename_tmpl)
 
+            # Code modification added by franmuline
+            if 'partitions' in opt:
+                partition_file_name = opt['partitions'] + '/' + self.opt['phase'] + '.txt'
+                filtered_paths = []
+                with open(partition_file_name, 'r') as f:
+                    # Read all lines and put them in a list
+                    lines = f.readlines()
+                    # Remove the '\n' at the end of each line
+                    lines = [line.rstrip() for line in lines]
+                    # Filter the paths that are in the partition
+                    for element in self.paths:
+                        # Get last element of the gt path
+                        gt_path = element['gt_path']
+                        gt_path = gt_path.split('/')[-1]
+                        # Get the first 5 characters of the gt path
+                        gt_path = gt_path[:5]
+                        # If the first 5 characters of the gt path are in the partition
+                        if gt_path in lines:
+                            # Add the element to the new list
+                            filtered_paths.append(element)
+                # Update the paths
+                self.paths = filtered_paths
+            # End of modification
+
         if self.opt['phase'] == 'train':
             self.geometric_augs = opt['geometric_augs']
 
