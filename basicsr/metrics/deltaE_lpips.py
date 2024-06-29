@@ -225,7 +225,7 @@ class deltaE00():
 class LPIPS():
     def __init__(self):
         super().__init__()
-        self.lpips = lpips.LPIPS(net='alex')
+        self.lpips = lpips.LPIPS(net='alex', verbose=False)
 
     def __call__(self, img1, img2):
         """ Compute the LPIPS between two numpy RGB images

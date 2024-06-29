@@ -290,6 +290,9 @@ class ImageCleanModel(BaseModel):
                             metric_module, metric_type)(visuals['result'], visuals['gt'], **opt_)
 
             cnt += 1
+            if cnt % 100 == 0:
+                logger = get_root_logger()
+                logger.info(f'Performing validation, current sample: {cnt} / {len(dataloader)}')
 
         current_metric = 0.
         if with_metrics:
@@ -300,7 +303,6 @@ class ImageCleanModel(BaseModel):
             self._log_validation_metric_values(current_iter, dataset_name,
                                                tb_logger)
         return current_metric
-
 
     def _log_validation_metric_values(self, current_iter, dataset_name,
                                       tb_logger):

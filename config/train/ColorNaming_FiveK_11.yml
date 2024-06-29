@@ -1,5 +1,5 @@
 # general settings
-name: ColorNaming_baseline
+name: ColorNaming_FiveK_11
 model_type: ImageCleanModel
 scale: 1
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -7,8 +7,42 @@ manual_seed: 100
 
 # dataset and data loader settings
 datasets:
-  test:
-    name: TestSet
+  train:
+    name: TrainSet
+    type: Dataset_PairedImage
+    dataroot_gt: ../../Datasets/FiveK/expertC_gt
+    dataroot_lq: ../../Datasets/FiveK/input
+    partitions: ../../Datasets/FiveK/Ours
+    geometric_augs: true
+
+    filename_tmpl: '{}'
+    io_backend:
+      type: disk
+
+    # data loader
+    use_shuffle: true
+    num_worker_per_gpu: 8
+    batch_size_per_gpu: 8
+
+    ### -------------Progressive training--------------------------
+    mini_batch_sizes: [8,5,4,2,1,1]             # Batch size per gpu
+    iters: [92000,64000,48000,36000,36000,24000]
+    gt_size: 384   # Max patch size for progressive training
+    gt_sizes: [128,160,192,256,320,384]  # Patch sizes for progressive training.
+    ### ------------------------------------------------------------
+
+    ### ------- Training on single fixed-patch size 128x128---------
+#    mini_batch_sizes: [1]
+#    iters: [30]
+#    gt_size: 128
+#    gt_sizes: [128]
+    ### ------------------------------------------------------------
+
+    dataset_enlarge_ratio: 1
+    prefetch_mode: ~
+
+  val:
+    name: ValSet
     type: Dataset_PairedImage
     dataroot_gt: ../../Datasets/FiveK/expertC_gt
     dataroot_lq: ../../Datasets/FiveK/input
@@ -19,7 +53,7 @@ datasets:
 # network structures
 network_g:
   type: Restormer
-  inp_channels: 3
+  inp_channels: 14
   out_channels: 3
   dim: 48
   num_blocks: [4,6,6,8]
@@ -69,8 +103,8 @@ train:
     loss_weight: 1
     reduction: mean
 
-# test settings
-test:
+# validation settings
+val:
   window_size: 8
   val_freq: !!float 4e3
   save_img: false
@@ -79,36 +113,45 @@ test:
   max_minibatch: 8
 
   metrics:
-     deltaE00:
+    psnr: # metric name, can be arbitrary
+      type: calculate_psnr
+      crop_border: 0
+      test_y_channel: false
+
+    ssim:
+        type: calculate_ssim
+        crop_border: 0
+        test_y_channel: false
+
+    deltaE00:
         type: calculate_deltaE00
         crop_border: 0
         test_y_channel: false
 
-     deltaEab:
+    deltaEab:
         type: calculate_deltaEab
         crop_border: 0
         test_y_channel: false
 
-#    psnr: # metric name, can be arbitrary
-#      type: calculate_psnr
-#      crop_border: 0
-#      test_y_channel: false
-#
-#    ssim:
-#        type: calculate_ssim
-#        crop_border: 0
-#        test_y_channel: false
+    lpips:
+        type: calculate_lpips
+        crop_border: 0
+        test_y_channel: false
 
 # logging settings
 logger:
-  print_freq: 5
+  print_freq: 1000
   save_checkpoint_freq: !!float 4e3
   use_tb_logger: true
   wandb:
-    project: ~
+    project: TFM
     resume_id: ~
 
 # dist training settings
 dist_params:
   backend: nccl
   port: 29500
+
+# color naming settings
+color_naming:
+  num_categories: 11

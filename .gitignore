@@ -3,3 +3,4 @@
 /experiments
 /basicsr/tb_logger
 /results
+*wandb*
