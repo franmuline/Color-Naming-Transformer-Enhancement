@@ -295,3 +295,29 @@ class Restormer(nn.Module):
 
         return out_dec_level1
 
+# *****************************************************************************
+# *                                                                           *
+# *             Code added by Francisco Antonio Molina Bakhos                 *
+# *                                                                           *
+# *****************************************************************************
+
+
+class CNEncoderLayer(nn.Module):
+    """
+    Encoder layer for a Color Naming encoder. It is a simple convolutional layer with a ReLU activation and a max
+    pooling layer. Its only purpose is to reduce the spatial dimensions of the input tensor
+    (which will be the color naming maps) extracting meaningful features.
+    The convolutional layer receives an input with the form (B, Cin, H, W) and returns an output with the form
+    (B, Cout, H/2, W/2).
+    """
+    def __init__(self, in_channels, out_channels):
+        super(CNEncoderLayer, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        self.relu = nn.ReLU()
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.relu(x)
+        x = self.pool(x)
+        return x
