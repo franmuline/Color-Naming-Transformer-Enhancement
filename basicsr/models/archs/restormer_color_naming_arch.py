@@ -5,7 +5,8 @@ Implements the modified version of Restormer's color naming model.
 import torch
 import torch.nn as nn
 from einops import rearrange
-from restormer_arch import LayerNorm, FeedForward, OverlapPatchEmbed, Downsample, Upsample, TransformerBlock
+from .restormer_arch import LayerNorm, FeedForward, OverlapPatchEmbed, Downsample, Upsample, TransformerBlock
+from .arch_util import CustomSequential
 
 
 ##########################################################################
@@ -18,13 +19,31 @@ class CNEncoderLayer(nn.Module):
     The convolutional layer receives an input with the form (B, Cin, H, W) and returns an output with the form
     (B, Cout, H/pooling_factor, W/pooling_factor).
     """
-    def __init__(self, in_channels, out_channels, pooling_factor=2, max_pooling=True):
+    def __init__(self, in_channels, out_channels, pooling_factor=2, max_pooling=True, activation='relu'):
         super(CNEncoderLayer, self).__init__()
         if pooling_factor % 2 != 0:
             raise ValueError("The pooling factor must be an even number.")
 
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
-        self.relu = nn.ReLU()
+
+        if activation == 'relu':
+            self.activation = nn.ReLU()
+        elif activation == 'leaky_relu':
+            self.activation = nn.LeakyReLU(negative_slope=0.01)
+        elif activation == 'prelu':
+            self.activation = nn.PReLU()
+        elif activation == 'elu':
+            self.activation = nn.ELU()
+        elif activation == 'selu':
+            self.activation = nn.SELU()
+        elif activation == 'sigmoid':
+            self.activation = nn.Sigmoid()
+        elif activation == 'tanh':
+            self.activation = nn.Tanh()
+        elif activation == 'swish':
+            self.activation = nn.SiLU()
+        else:
+            raise ValueError("Unsupported activation function")
         if max_pooling:
             self.pool = nn.MaxPool2d(kernel_size=pooling_factor, stride=pooling_factor)
         else:
@@ -32,13 +51,14 @@ class CNEncoderLayer(nn.Module):
 
     def forward(self, x):
         x = self.conv(x)
-        x = self.relu(x)
+        x = self.activation(x)
         x = self.pool(x)
+        # Normalize the output tensor
+        x = torch.nn.functional.normalize(x, dim=1)
         return x
 
 ##########################################################################
 ## Color Naming Multi-DConv Head Transposed Self-Attention (MDTA)
-
 class AttentionCN(nn.Module):
     """
     Multi-DConv Head Transposed Self-Attention (MDTA) modified to incorporate the encoded color naming maps
@@ -109,6 +129,7 @@ class TransformerBlockCN(nn.Module):
 
         return x, cn
 
+
 ##########################################################################
 ##---------- Restormer with Color Naming maps -----------------------
 class RestormerCN(nn.Module):
@@ -120,6 +141,8 @@ class RestormerCN(nn.Module):
                  num_refinement_blocks=4,
                  heads=[1, 2, 4, 8],
                  boolean_cne=[True, True, True, True],  ## Boolean list to include the CNE layers in the encoder part of the model
+                 max_pooling=True,  ## Boolean to include max pooling in the CNE layers. Avg pooling is used otherwise
+                 cne_activation='relu',
                  ffn_expansion_factor=2.66,
                  bias=False,
                  LayerNorm_type='WithBias',  ## Other option 'BiasFree'
@@ -135,48 +158,24 @@ class RestormerCN(nn.Module):
         self.boolean_cne = boolean_cne
 
         self.image_patch_embed = OverlapPatchEmbed(3, dim)
-        self.cn_patch_embed = OverlapPatchEmbed(inp_channels - 3, dim)
+        self.cn_patch_embed = OverlapPatchEmbed(inp_channels - 3, dim, bias=True)
 
-        if self.boolean_cne[0]:
-            self.encoder_level1 = nn.Sequential(*[TransformerBlockCN(dim=dim, num_heads=heads[0], ffn_expansion_factor=ffn_expansion_factor, bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[0])])
-        else:
-            self.encoder_level1 = nn.Sequential(*[TransformerBlock(dim=dim, num_heads=heads[0], ffn_expansion_factor=ffn_expansion_factor, bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[0])])
+        self.encoder_level1 = self.choose_sequential_type(dim, heads[0], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[0], boolean_cne[0])
 
-        self.cne_1_2 = CNEncoderLayer(int(dim), int(dim*2**1))  # First CNE layer (from level 1 to level 2)
+        self.cne_1_2 = CNEncoderLayer(int(dim), int(dim*2**1), max_pooling=max_pooling, activation=cne_activation)  # First CNE layer (from level 1 to level 2)
 
         self.down_1_2 = Downsample(dim)  ## From Level 1 to Level 2
-        if self.boolean_cne[1]:
-            self.encoder_level2 = nn.Sequential(*[
-                TransformerBlockCN(dim=int(dim * 2 ** 1), num_heads=heads[1], ffn_expansion_factor=ffn_expansion_factor,
-                                 bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[1])])
-        else:
-            self.encoder_level2 = nn.Sequential(*[
-                TransformerBlock(dim=int(dim * 2 ** 1), num_heads=heads[1], ffn_expansion_factor=ffn_expansion_factor,
-                                 bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[1])])
+        self.encoder_level2 = self.choose_sequential_type(int(dim*2**1), heads[1], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[1], boolean_cne[1])
 
-        self.cne_2_3 = CNEncoderLayer(int(dim * 2 ** 1), int(dim * 2 ** 2))  # Second CNE layer (from level 2 to level 3)
+        self.cne_2_3 = CNEncoderLayer(int(dim * 2 ** 1), int(dim * 2 ** 2), max_pooling=max_pooling, activation=cne_activation)  # Second CNE layer (from level 2 to level 3)
 
         self.down2_3 = Downsample(int(dim * 2 ** 1))  ## From Level 2 to Level 3
-        if self.boolean_cne[2]:
-            self.encoder_level3 = nn.Sequential(*[
-                TransformerBlockCN(dim=int(dim * 2 ** 2), num_heads=heads[2], ffn_expansion_factor=ffn_expansion_factor,
-                                 bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[2])])
-        else:
-            self.encoder_level3 = nn.Sequential(*[
-                TransformerBlock(dim=int(dim * 2 ** 2), num_heads=heads[2], ffn_expansion_factor=ffn_expansion_factor,
-                                 bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[2])])
+        self.encoder_level3 = self.choose_sequential_type(int(dim*2**2), heads[2], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[2], boolean_cne[2])
 
-        self.cne_3_4 = CNEncoderLayer(int(dim * 2 ** 2), int(dim * 2 ** 3))  # Third CNE layer (from level 3 to level 4)
+        self.cne_3_4 = CNEncoderLayer(int(dim * 2 ** 2), int(dim * 2 ** 3), max_pooling=max_pooling, activation=cne_activation)  # Third CNE layer (from level 3 to level 4)
 
         self.down3_4 = Downsample(int(dim * 2 ** 2))  ## From Level 3 to Level 4
-        if self.boolean_cne[3]:
-            self.latent = nn.Sequential(*[
-                TransformerBlockCN(dim=int(dim * 2 ** 3), num_heads=heads[3], ffn_expansion_factor=ffn_expansion_factor,
-                                 bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[3])])
-        else:
-            self.latent = nn.Sequential(*[
-                TransformerBlock(dim=int(dim * 2 ** 3), num_heads=heads[3], ffn_expansion_factor=ffn_expansion_factor,
-                                 bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[3])])
+        self.latent = self.choose_sequential_type(int(dim*2**3), heads[3], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[3], boolean_cne[3])
 
         self.up4_3 = Upsample(int(dim * 2 ** 3))  ## From Level 4 to Level 3
         self.reduce_chan_level3 = nn.Conv2d(int(dim * 2 ** 3), int(dim * 2 ** 2), kernel_size=1, bias=bias)
@@ -208,6 +207,29 @@ class RestormerCN(nn.Module):
 
         self.output = nn.Conv2d(int(dim * 2 ** 1), out_channels, kernel_size=3, stride=1, padding=1, bias=bias)
 
+    def choose_sequential_type(self, dim, num_heads, ffn_expansion_factor, bias, LayerNorm_type, num_blocks, boolean_cne):
+        """
+        Choose the type of Sequential layer to use in the model. If the boolean_cne is True, use the CustomSequential.
+        The nn.Sequential module does not allow for multiple inputs and outputs in the forward method.
+        Args:
+            num_heads: number of heads in the multi-head attention mechanism
+            ffn_expansion_factor: expansion factor of the feed-forward network
+            bias: bias in the convolutional layers
+            LayerNorm_type: type of LayerNorm to use
+            num_blocks: number of Transformer blocks
+            boolean_cne: boolean to include the color naming maps in the model
+        Returns:
+            nn.Sequential: Sequential layer with the Transformer blocks
+        """
+        if boolean_cne:
+            return CustomSequential(
+                *[TransformerBlockCN(dim=dim, num_heads=num_heads, ffn_expansion_factor=ffn_expansion_factor,
+                                     bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks)])
+        else:
+            return nn.Sequential(
+                *[TransformerBlock(dim=dim, num_heads=num_heads, ffn_expansion_factor=ffn_expansion_factor,
+                                   bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks)])
+
     def forward(self, inp):
         # Assert that input batch has to have more than 3 channels
         # (3 for the image and the rest for the color naming maps)
@@ -218,34 +240,22 @@ class RestormerCN(nn.Module):
         inp_img_enc_level1 = self.image_patch_embed(inp_img)
         inp_cn_enc_level1 = self.cn_patch_embed(cn_maps)
 
-        if self.boolean_cne[0]:
-            out_enc_level1, cn_enc_level1 = self.encoder_level1(inp_img_enc_level1, inp_cn_enc_level1)
-        else:
-            out_enc_level1 = self.encoder_level1(inp_img_enc_level1)
+        out_enc_level1 = self.encoder_forward(inp_img_enc_level1, inp_cn_enc_level1, self.encoder_level1, self.boolean_cne[0])
 
         inp_img_enc_level2 = self.down_1_2(out_enc_level1)
         inp_cn_enc_level2 = self.cne_1_2(inp_cn_enc_level1)
 
-        if self.boolean_cne[1]:
-            out_enc_level2, cn_enc_level2 = self.encoder_level2(inp_img_enc_level2, inp_cn_enc_level2)
-        else:
-            out_enc_level2 = self.encoder_level2(inp_img_enc_level2)
+        out_enc_level2 = self.encoder_forward(inp_img_enc_level2, inp_cn_enc_level2, self.encoder_level2, self.boolean_cne[1])
 
         inp_img_enc_level3 = self.down2_3(out_enc_level2)
         inp_cn_enc_level3 = self.cne_2_3(inp_cn_enc_level2)
 
-        if self.boolean_cne[2]:
-            out_enc_level3, cn_enc_level3 = self.encoder_level3(inp_img_enc_level3, inp_cn_enc_level3)
-        else:
-            out_enc_level3 = self.encoder_level3(inp_img_enc_level3)
+        out_enc_level3 = self.encoder_forward(inp_img_enc_level3, inp_cn_enc_level3, self.encoder_level3, self.boolean_cne[2])
 
         inp_img_enc_level4 = self.down3_4(out_enc_level3)
         inp_cn_enc_level4 = self.cne_3_4(inp_cn_enc_level3)
 
-        if self.boolean_cne[3]:
-            latent, cn_enc_level4 = self.latent(inp_img_enc_level4, inp_cn_enc_level4)
-        else:
-            latent = self.latent(inp_img_enc_level4)
+        latent = self.encoder_forward(inp_img_enc_level4, inp_cn_enc_level4, self.latent, self.boolean_cne[3])
 
         inp_dec_level3 = self.up4_3(latent)
         inp_dec_level3 = torch.cat([inp_dec_level3, out_enc_level3], 1)
@@ -267,11 +277,30 @@ class RestormerCN(nn.Module):
 
         return out_dec_level1
 
+    def encoder_forward(self, inp_img_enc, inp_cn_enc, encoder, cne):
+        """
+        Forward method for the encoder part of the model. It receives the input image and the color naming maps and
+        returns the output of the encoder.
+        Args:
+            inp_img_enc: Encoded image tensor
+            inp_cn_enc: Encoded color naming tensor
+            encoder: Encoder module
+            cne: Boolean to include the color naming maps in the model
+        Returns:
+            Output of the encoder
+        """
+        if cne:
+            return encoder(inp_img_enc, inp_cn_enc)[0]
+        else:
+            return encoder(inp_img_enc)
+
+
 if __name__ == "__main__":
-    model = RestormerCN(inp_channels=6).to('cuda')
+    model = RestormerCN(inp_channels=6, cne_activation='prelu').to('cuda')
     print(model)
 
     # Test the model
-    inp = torch.randn(1, 6, 256, 256).to('cuda')
+    # Generate random input tensor with 6 channels with shape (1, 6, 256, 256) and values between 0 and 1
+    inp = torch.rand((1, 6, 128, 128)).to('cuda')
     out = model(inp)
 

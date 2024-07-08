@@ -52,13 +52,16 @@ datasets:
 
 # network structures
 network_g:
-  type: Restormer
+  type: RestormerCN
   inp_channels: 9
   out_channels: 3
   dim: 48
   num_blocks: [4,6,6,8]
   num_refinement_blocks: 4
   heads: [1,2,4,8]
+  boolean_cne: [true,true,true,true]
+  max_pooling: false
+  cne_activation: relu
   ffn_expansion_factor: 2.66
   bias: False
   LayerNorm_type: WithBias
@@ -144,7 +147,7 @@ logger:
   save_checkpoint_freq: !!float 4e3
   use_tb_logger: true
   wandb:
-    project: TFM
+    project: ~
     resume_id: ~
 
 # dist training settings

@@ -63,7 +63,7 @@ class ImageCleanModel(BaseModel):
             self.mixing_augmentation = Mixing_Augment(mixup_beta, use_identity, self.device)
 
         # Code modification added by franmuline
-        if opt['color_naming']['color_naming_instance'] is not None:
+        if opt['color_naming']['color_naming_instance'] is not None and opt['network_g']['type'] == 'Restormer':
             opt['network_g']['color_naming'] = True
         # End of code modification
 

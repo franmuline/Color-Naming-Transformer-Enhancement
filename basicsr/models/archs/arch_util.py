@@ -253,3 +253,22 @@ def pixel_unshuffle(x, scale):
 #         return modulated_deform_conv(x, offset, mask, self.weight, self.bias,
 #                                      self.stride, self.padding, self.dilation,
 #                                      self.groups, self.deformable_groups)
+
+
+# *****************************************************************************
+# *                                                                           *
+# *             Code added by Francisco Antonio Molina Bakhos                 *
+# *                                                                           *
+# *****************************************************************************
+
+class CustomSequential(nn.Sequential):
+    """Custom Sequential class to allow forward method with multiple inputs.
+
+    Args:
+        *args: nn.Modules.
+    """
+
+    def forward(self, *inputs):
+        for module in self._modules.values():
+            inputs = module(*inputs)
+        return inputs
