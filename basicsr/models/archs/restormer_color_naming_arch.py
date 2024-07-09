@@ -42,6 +42,8 @@ class CNEncoderLayer(nn.Module):
             self.activation = nn.Tanh()
         elif activation == 'swish':
             self.activation = nn.SiLU()
+        elif activation == 'none':
+            self.activation = nn.Identity()
         else:
             raise ValueError("Unsupported activation function")
         if max_pooling:
@@ -158,7 +160,7 @@ class RestormerCN(nn.Module):
         self.boolean_cne = boolean_cne
 
         self.image_patch_embed = OverlapPatchEmbed(3, dim)
-        self.cn_patch_embed = OverlapPatchEmbed(inp_channels - 3, dim, bias=True)
+        self.cn_patch_embed = OverlapPatchEmbed(inp_channels - 3, dim)
 
         self.encoder_level1 = self.choose_sequential_type(dim, heads[0], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[0], boolean_cne[0])
 

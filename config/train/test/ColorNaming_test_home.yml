@@ -59,9 +59,9 @@ network_g:
   num_blocks: [4,6,6,8]
   num_refinement_blocks: 4
   heads: [1,2,4,8]
-  boolean_cne: [true,true,true,true]
+  boolean_cne: [false,true,true,true]
   max_pooling: false
-  cne_activation: relu
+  cne_activation: none
   ffn_expansion_factor: 2.66
   bias: False
   LayerNorm_type: WithBias
