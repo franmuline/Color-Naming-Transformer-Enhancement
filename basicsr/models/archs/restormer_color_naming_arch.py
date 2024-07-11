@@ -32,6 +32,8 @@ class CNEncoderLayer(nn.Module):
             self.activation = nn.LeakyReLU(negative_slope=0.01)
         elif activation == 'prelu':
             self.activation = nn.PReLU()
+        elif activation == 'gelu':
+            self.activation = nn.GELU()
         elif activation == 'elu':
             self.activation = nn.ELU()
         elif activation == 'selu':
