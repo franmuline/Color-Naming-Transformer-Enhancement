@@ -155,7 +155,7 @@ class RestormerCN(nn.Module):
                  num_blocks=[4, 6, 6, 8],
                  num_refinement_blocks=4,
                  heads=[1, 2, 4, 8],
-                 boolean_cne=[True, True, True, True],  ## Boolean list to include the CNE layers in the encoder part of the model
+                 boolean_cne=[True, True, True, True, False, False, False],  ## Boolean list to include the CNE layers in the encoder part of the model
                  cn_only=False,  ## Boolean to use CN maps ONLY as query or value in attention (it is summed to query or value otherwise)
                  cn_as_value=False,  ## Boolean to use the color naming maps as the value in the attention mechanism. It is used as the query otherwise
                  max_pooling=True,  ## Boolean to include max pooling in the CNE layers. Avg pooling is used otherwise
@@ -167,6 +167,13 @@ class RestormerCN(nn.Module):
                  ):
 
         super(RestormerCN, self).__init__()
+
+        if len(boolean_cne) < 7:
+            # Add false values to the boolean_cne list until it reaches 7 elements
+            boolean_cne += [False] * (7 - len(boolean_cne))
+        elif len(boolean_cne) > 7:
+            raise ValueError("The boolean_cne list must have 7 elements or less. It is assumed that if the list has less"
+                             " than 7 elements, the rest of the elements are False.")
 
         # Assert that there is at least one CNE layer in the model
         assert any(boolean_cne), ("There must be at least one CNE layer in the model. Use the original Restormer model "
@@ -196,21 +203,15 @@ class RestormerCN(nn.Module):
 
         self.up4_3 = Upsample(int(dim * 2 ** 3))  ## From Level 4 to Level 3
         self.reduce_chan_level3 = nn.Conv2d(int(dim * 2 ** 3), int(dim * 2 ** 2), kernel_size=1, bias=bias)
-        self.decoder_level3 = nn.Sequential(*[
-            TransformerBlock(dim=int(dim * 2 ** 2), num_heads=heads[2], ffn_expansion_factor=ffn_expansion_factor,
-                             bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[2])])
+        self.decoder_level3 = self.choose_sequential_type(int(dim*2**2), heads[2], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[2], boolean_cne[4], cn_only=cn_only, cn_as_value=cn_as_value)
 
         self.up3_2 = Upsample(int(dim * 2 ** 2))  ## From Level 3 to Level 2
         self.reduce_chan_level2 = nn.Conv2d(int(dim * 2 ** 2), int(dim * 2 ** 1), kernel_size=1, bias=bias)
-        self.decoder_level2 = nn.Sequential(*[
-            TransformerBlock(dim=int(dim * 2 ** 1), num_heads=heads[1], ffn_expansion_factor=ffn_expansion_factor,
-                             bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[1])])
+        self.decoder_level2 = self.choose_sequential_type(int(dim*2**1), heads[1], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[1], boolean_cne[5], cn_only=cn_only, cn_as_value=cn_as_value)
 
         self.up2_1 = Upsample(int(dim * 2 ** 1))  ## From Level 2 to Level 1  (NO 1x1 conv to reduce channels)
 
-        self.decoder_level1 = nn.Sequential(*[
-            TransformerBlock(dim=int(dim * 2 ** 1), num_heads=heads[0], ffn_expansion_factor=ffn_expansion_factor,
-                             bias=bias, LayerNorm_type=LayerNorm_type) for i in range(num_blocks[0])])
+        self.decoder_level1 = self.choose_sequential_type(dim, heads[0], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[0], boolean_cne[6], cn_only=cn_only, cn_as_value=cn_as_value)
 
         self.refinement = nn.Sequential(*[
             TransformerBlock(dim=int(dim * 2 ** 1), num_heads=heads[0], ffn_expansion_factor=ffn_expansion_factor,
@@ -257,36 +258,36 @@ class RestormerCN(nn.Module):
         inp_img_enc_level1 = self.image_patch_embed(inp_img)
         inp_cn_enc_level1 = self.cn_patch_embed(cn_maps)
 
-        out_enc_level1 = self.encoder_forward(inp_img_enc_level1, inp_cn_enc_level1, self.encoder_level1, self.boolean_cne[0])
+        out_enc_level1 = self.transformer_block_forward(inp_img_enc_level1, inp_cn_enc_level1, self.encoder_level1, self.boolean_cne[0])
 
         inp_img_enc_level2 = self.down_1_2(out_enc_level1)
         inp_cn_enc_level2 = self.cne_1_2(inp_cn_enc_level1)
 
-        out_enc_level2 = self.encoder_forward(inp_img_enc_level2, inp_cn_enc_level2, self.encoder_level2, self.boolean_cne[1])
+        out_enc_level2 = self.transformer_block_forward(inp_img_enc_level2, inp_cn_enc_level2, self.encoder_level2, self.boolean_cne[1])
 
         inp_img_enc_level3 = self.down2_3(out_enc_level2)
         inp_cn_enc_level3 = self.cne_2_3(inp_cn_enc_level2)
 
-        out_enc_level3 = self.encoder_forward(inp_img_enc_level3, inp_cn_enc_level3, self.encoder_level3, self.boolean_cne[2])
+        out_enc_level3 = self.transformer_block_forward(inp_img_enc_level3, inp_cn_enc_level3, self.encoder_level3, self.boolean_cne[2])
 
         inp_img_enc_level4 = self.down3_4(out_enc_level3)
         inp_cn_enc_level4 = self.cne_3_4(inp_cn_enc_level3)
 
-        latent = self.encoder_forward(inp_img_enc_level4, inp_cn_enc_level4, self.latent, self.boolean_cne[3])
+        latent = self.transformer_block_forward(inp_img_enc_level4, inp_cn_enc_level4, self.latent, self.boolean_cne[3])
 
         inp_dec_level3 = self.up4_3(latent)
         inp_dec_level3 = torch.cat([inp_dec_level3, out_enc_level3], 1)
         inp_dec_level3 = self.reduce_chan_level3(inp_dec_level3)
-        out_dec_level3 = self.decoder_level3(inp_dec_level3)
+        out_dec_level3 = self.transformer_block_forward(inp_dec_level3, inp_cn_enc_level3, self.decoder_level3, self.boolean_cne[4])
 
         inp_dec_level2 = self.up3_2(out_dec_level3)
         inp_dec_level2 = torch.cat([inp_dec_level2, out_enc_level2], 1)
         inp_dec_level2 = self.reduce_chan_level2(inp_dec_level2)
-        out_dec_level2 = self.decoder_level2(inp_dec_level2)
+        out_dec_level2 = self.transformer_block_forward(inp_dec_level2, inp_cn_enc_level2, self.decoder_level2, self.boolean_cne[5])
 
         inp_dec_level1 = self.up2_1(out_dec_level2)
         inp_dec_level1 = torch.cat([inp_dec_level1, out_enc_level1], 1)
-        out_dec_level1 = self.decoder_level1(inp_dec_level1)
+        out_dec_level1 = self.transformer_block_forward(inp_dec_level1, inp_cn_enc_level1, self.decoder_level1, self.boolean_cne[6])
 
         out_dec_level1 = self.refinement(out_dec_level1)
 
@@ -294,22 +295,22 @@ class RestormerCN(nn.Module):
 
         return out_dec_level1
 
-    def encoder_forward(self, inp_img_enc, inp_cn_enc, encoder, cne):
+    def transformer_block_forward(self, inp_img_enc, inp_cn_enc, block, cne):
         """
         Forward method for the encoder part of the model. It receives the input image and the color naming maps and
         returns the output of the encoder.
         Args:
             inp_img_enc: Encoded image tensor
             inp_cn_enc: Encoded color naming tensor
-            encoder: Encoder module
+            block: Transformer block module
             cne: Boolean to include the color naming maps in the model
         Returns:
             Output of the encoder
         """
         if cne:
-            return encoder(inp_img_enc, inp_cn_enc)[0]
+            return block(inp_img_enc, inp_cn_enc)[0]
         else:
-            return encoder(inp_img_enc)
+            return block(inp_img_enc)
 
 
 if __name__ == "__main__":
