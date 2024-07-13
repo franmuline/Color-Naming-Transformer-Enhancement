@@ -57,8 +57,6 @@ class CNEncoderLayer(nn.Module):
         x = self.conv(x)
         x = self.activation(x)
         x = self.pool(x)
-        # Normalize the output tensor
-        x = torch.nn.functional.normalize(x, dim=1)
         return x
 
 ##########################################################################
@@ -68,7 +66,7 @@ class AttentionCN(nn.Module):
     Multi-DConv Head Transposed Self-Attention (MDTA) modified to incorporate the encoded color naming maps
     in the attention mechanism.
     """
-    def __init__(self, dim, num_heads, bias, query_cn_only=False):
+    def __init__(self, dim, num_heads, bias, cn_only=False, cn_as_value=False):
         super(AttentionCN, self).__init__()
         self.num_heads = num_heads
         self.temperature = nn.Parameter(torch.ones(num_heads, 1, 1))
@@ -81,7 +79,8 @@ class AttentionCN(nn.Module):
         self.qkv_dwconv = nn.Conv2d(dim * 3, dim * 3, kernel_size=3, stride=1, padding=1, groups=dim * 3, bias=bias)
         self.project_out = nn.Conv2d(dim, dim, kernel_size=1, bias=bias)
 
-        self.query_cn_only = query_cn_only
+        self.cn_only = cn_only
+        self.cn_as_value = cn_as_value
 
     def forward(self, x, cn):
         assert x.shape == cn.shape, "The input tensor and the color naming tensor must have the same shape."
@@ -97,15 +96,21 @@ class AttentionCN(nn.Module):
         k = rearrange(k, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
         v = rearrange(v, 'b (head c) h w -> b head c (h w)', head=self.num_heads)
 
-        cn = torch.nn.functional.normalize(cn, dim=-1)
         q = torch.nn.functional.normalize(q, dim=-1)
         k = torch.nn.functional.normalize(k, dim=-1)
 
-        if self.query_cn_only:
-            q = cn
+        if self.cn_as_value:
+            if self.cn_only:
+                v = cn
+            else:
+                v = v + cn
         else:
-            q = q + cn
-            q = torch.nn.functional.normalize(q, dim=-1)
+            cn = torch.nn.functional.normalize(cn, dim=-1)
+            if self.cn_only:
+                q = cn
+            else:
+                q = q + cn
+                q = torch.nn.functional.normalize(q, dim=-1)
 
         attn = (q @ k.transpose(-2, -1)) * self.temperature
         attn = attn.softmax(dim=-1)
@@ -117,17 +122,18 @@ class AttentionCN(nn.Module):
         out = self.project_out(out)
         return out
 
+
 ##########################################################################
 ## Modified Transformer Block to include the Color Naming maps
 class TransformerBlockCN(nn.Module):
-    def __init__(self, dim, num_heads, ffn_expansion_factor, bias, LayerNorm_type, query_cn_only=False):
+    def __init__(self, dim, num_heads, ffn_expansion_factor, bias, LayerNorm_type, cn_only=False, cn_as_value=False):
         super(TransformerBlockCN, self).__init__()
 
         # Normalization layer for the image features
         self.norm1 = LayerNorm(dim, LayerNorm_type)
         # Normalization layer for the color naming features
         self.norm2 = LayerNorm(dim, LayerNorm_type)
-        self.attn = AttentionCN(dim, num_heads, bias, query_cn_only=query_cn_only)
+        self.attn = AttentionCN(dim, num_heads, bias, cn_only=cn_only, cn_as_value=cn_as_value)
         # Normalization layer for the output of the attention mechanism
         self.norm3 = LayerNorm(dim, LayerNorm_type)
         self.ffn = FeedForward(dim, ffn_expansion_factor, bias)
@@ -150,7 +156,8 @@ class RestormerCN(nn.Module):
                  num_refinement_blocks=4,
                  heads=[1, 2, 4, 8],
                  boolean_cne=[True, True, True, True],  ## Boolean list to include the CNE layers in the encoder part of the model
-                 query_cn_only=False,  ## Boolean to use only the color naming maps in the query of the attention mechanism
+                 cn_only=False,  ## Boolean to use CN maps ONLY as query or value in attention (it is summed to query or value otherwise)
+                 cn_as_value=False,  ## Boolean to use the color naming maps as the value in the attention mechanism. It is used as the query otherwise
                  max_pooling=True,  ## Boolean to include max pooling in the CNE layers. Avg pooling is used otherwise
                  cne_activation='relu',
                  ffn_expansion_factor=2.66,
@@ -170,22 +177,22 @@ class RestormerCN(nn.Module):
         self.image_patch_embed = OverlapPatchEmbed(3, dim)
         self.cn_patch_embed = OverlapPatchEmbed(inp_channels - 3, dim)
 
-        self.encoder_level1 = self.choose_sequential_type(dim, heads[0], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[0], boolean_cne[0], query_cn_only=query_cn_only)
+        self.encoder_level1 = self.choose_sequential_type(dim, heads[0], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[0], boolean_cne[0], cn_only=cn_only, cn_as_value=cn_as_value)
 
         self.cne_1_2 = CNEncoderLayer(int(dim), int(dim*2**1), max_pooling=max_pooling, activation=cne_activation)  # First CNE layer (from level 1 to level 2)
 
         self.down_1_2 = Downsample(dim)  ## From Level 1 to Level 2
-        self.encoder_level2 = self.choose_sequential_type(int(dim*2**1), heads[1], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[1], boolean_cne[1], query_cn_only=query_cn_only)
+        self.encoder_level2 = self.choose_sequential_type(int(dim*2**1), heads[1], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[1], boolean_cne[1], cn_only=cn_only, cn_as_value=cn_as_value)
 
         self.cne_2_3 = CNEncoderLayer(int(dim * 2 ** 1), int(dim * 2 ** 2), max_pooling=max_pooling, activation=cne_activation)  # Second CNE layer (from level 2 to level 3)
 
         self.down2_3 = Downsample(int(dim * 2 ** 1))  ## From Level 2 to Level 3
-        self.encoder_level3 = self.choose_sequential_type(int(dim*2**2), heads[2], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[2], boolean_cne[2], query_cn_only=query_cn_only)
+        self.encoder_level3 = self.choose_sequential_type(int(dim*2**2), heads[2], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[2], boolean_cne[2], cn_only=cn_only, cn_as_value=cn_as_value)
 
         self.cne_3_4 = CNEncoderLayer(int(dim * 2 ** 2), int(dim * 2 ** 3), max_pooling=max_pooling, activation=cne_activation)  # Third CNE layer (from level 3 to level 4)
 
         self.down3_4 = Downsample(int(dim * 2 ** 2))  ## From Level 3 to Level 4
-        self.latent = self.choose_sequential_type(int(dim*2**3), heads[3], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[3], boolean_cne[3], query_cn_only=query_cn_only)
+        self.latent = self.choose_sequential_type(int(dim*2**3), heads[3], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[3], boolean_cne[3], cn_only=cn_only, cn_as_value=cn_as_value)
 
         self.up4_3 = Upsample(int(dim * 2 ** 3))  ## From Level 4 to Level 3
         self.reduce_chan_level3 = nn.Conv2d(int(dim * 2 ** 3), int(dim * 2 ** 2), kernel_size=1, bias=bias)
@@ -217,7 +224,7 @@ class RestormerCN(nn.Module):
 
         self.output = nn.Conv2d(int(dim * 2 ** 1), out_channels, kernel_size=3, stride=1, padding=1, bias=bias)
 
-    def choose_sequential_type(self, dim, num_heads, ffn_expansion_factor, bias, LayerNorm_type, num_blocks, boolean_cne, query_cn_only):
+    def choose_sequential_type(self, dim, num_heads, ffn_expansion_factor, bias, LayerNorm_type, num_blocks, boolean_cne, cn_only=False, cn_as_value=False):
         """
         Choose the type of Sequential layer to use in the model. If the boolean_cne is True, use the CustomSequential.
         The nn.Sequential module does not allow for multiple inputs and outputs in the forward method.
@@ -234,7 +241,7 @@ class RestormerCN(nn.Module):
         if boolean_cne:
             return CustomSequential(
                 *[TransformerBlockCN(dim=dim, num_heads=num_heads, ffn_expansion_factor=ffn_expansion_factor,
-                                     bias=bias, LayerNorm_type=LayerNorm_type, query_cn_only=query_cn_only) for i in range(num_blocks)])
+                                     bias=bias, LayerNorm_type=LayerNorm_type, cn_only=cn_only, cn_as_value=cn_as_value) for i in range(num_blocks)])
         else:
             return nn.Sequential(
                 *[TransformerBlock(dim=dim, num_heads=num_heads, ffn_expansion_factor=ffn_expansion_factor,
