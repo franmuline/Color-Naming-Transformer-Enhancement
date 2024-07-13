@@ -211,7 +211,7 @@ class RestormerCN(nn.Module):
 
         self.up2_1 = Upsample(int(dim * 2 ** 1))  ## From Level 2 to Level 1  (NO 1x1 conv to reduce channels)
 
-        self.decoder_level1 = self.choose_sequential_type(dim, heads[0], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[0], boolean_cne[6], cn_only=cn_only, cn_as_value=cn_as_value)
+        self.decoder_level1 = self.choose_sequential_type(int(dim * 2 ** 1), heads[0], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[0], boolean_cne[6], cn_only=cn_only, cn_as_value=cn_as_value)
 
         self.refinement = nn.Sequential(*[
             TransformerBlock(dim=int(dim * 2 ** 1), num_heads=heads[0], ffn_expansion_factor=ffn_expansion_factor,
