@@ -59,7 +59,7 @@ network_g:
   num_blocks: [4,6,6,8]
   num_refinement_blocks: 4
   heads: [1,2,4,8]
-  boolean_cne: [false,false,false,true,true,true,true]
+  boolean_cne: [false,false,false,true,true,true,false]
   cn_only: false
   cn_as_value: false
   max_pooling: false
