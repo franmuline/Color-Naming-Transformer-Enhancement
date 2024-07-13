@@ -60,6 +60,8 @@ network_g:
   num_refinement_blocks: 4
   heads: [1,2,4,8]
   boolean_cne: [true,true,true,false]
+  cn_only: false
+  cn_as_value: false
   max_pooling: false
   cne_activation: none
   ffn_expansion_factor: 2.66
