@@ -62,7 +62,7 @@ network_g:
   boolean_cne: [false,true,true,true]
   cn_only: false
   cn_as_value: true
-  max_pooling: false
+  max_pooling: true
   cne_activation: none
   ffn_expansion_factor: 2.66
   bias: False
