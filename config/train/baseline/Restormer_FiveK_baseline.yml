@@ -1,5 +1,5 @@
 # general settings
-name: ColorNaming_FiveK_11
+name: Restormer_FiveK_baseline
 model_type: ImageCleanModel
 scale: 1
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -53,7 +53,7 @@ datasets:
 # network structures
 network_g:
   type: Restormer
-  inp_channels: 14
+  inp_channels: 3
   out_channels: 3
   dim: 48
   num_blocks: [4,6,6,8]
@@ -77,15 +77,15 @@ train:
   warmup_iter: -1 # no warm up
   use_grad_clip: true
 
-  # Split 300k iterations into two cycles.
-  # 1st cycle: fixed 3e-4 LR for 92k iters.
+  # Split 300k iterations into two cycles. 
+  # 1st cycle: fixed 3e-4 LR for 92k iters. 
   # 2nd cycle: cosine annealing (3e-4 to 1e-6) for 208k iters.
   scheduler:
     type: CosineAnnealingRestartCyclicLR
-    periods: [92000, 208000]
+    periods: [92000, 208000]       
     restart_weights: [1,1]
-    eta_mins: [0.0003,0.000001]
-
+    eta_mins: [0.0003,0.000001]   
+  
   mixing_augs:
     mixup: false
     mixup_beta: 1.2
@@ -96,7 +96,7 @@ train:
     lr: !!float 3e-4
     weight_decay: !!float 1e-4
     betas: [0.9, 0.999]
-
+  
   # losses
   pixel_opt:
     type: L1Loss
@@ -151,7 +151,3 @@ logger:
 dist_params:
   backend: nccl
   port: 29500
-
-# color naming settings
-color_naming:
-  num_categories: 11

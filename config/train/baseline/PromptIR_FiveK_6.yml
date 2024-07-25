@@ -1,5 +1,5 @@
 # general settings
-name: ColorNaming_FiveK_6
+name: PromptIR_FiveK_6
 model_type: ImageCleanModel
 scale: 1
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -52,8 +52,8 @@ datasets:
 
 # network structures
 network_g:
-  type: Restormer
-  inp_channels: 9
+  type: PromptIR
+  inp_channels: 6
   out_channels: 3
   dim: 48
   num_blocks: [4,6,6,8]
@@ -62,7 +62,7 @@ network_g:
   ffn_expansion_factor: 2.66
   bias: False
   LayerNorm_type: WithBias
-  dual_pixel_task: False
+  decoder: true
 
 
 # path
@@ -99,7 +99,7 @@ train:
 
   # losses
   pixel_opt:
-    type: L1Loss
+    type: BackboneL2SSIMLoss
     loss_weight: 1
     reduction: mean
 
