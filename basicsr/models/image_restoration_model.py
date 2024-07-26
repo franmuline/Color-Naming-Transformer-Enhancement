@@ -65,6 +65,11 @@ class ImageCleanModel(BaseModel):
         # Code modification added by franmuline
         if opt['color_naming']['color_naming_instance'] is not None and opt['network_g']['type'] == 'Restormer':
             opt['network_g']['color_naming'] = True
+
+        self.use_backbone = False
+        if 'backbone' in opt['network_g']:
+            self.use_backbone = True
+            assert opt['train']['pixel_opt']['type'] == 'BackboneL2SSIMLoss', 'BackboneL2SSIMLoss is the only loss supported for backbone training'
         # End of code modification
 
         self.net_g = define_network(deepcopy(opt['network_g']))
@@ -153,17 +158,31 @@ class ImageCleanModel(BaseModel):
 
     def optimize_parameters(self, current_iter):
         self.optimizer_g.zero_grad()
-        preds = self.net_g(self.lq)
-        if not isinstance(preds, list):
-            preds = [preds]
-
+        # Code modification added by franmuline
+        if self.use_backbone:
+            backbone_preds, preds = self.net_g(self.lq)
+            if not isinstance(preds, list):
+                preds = [preds]
+            if not isinstance(backbone_preds, list):
+                backbone_preds = [backbone_preds]
+        else:
+            preds = self.net_g(self.lq)
+            if not isinstance(preds, list):
+                preds = [preds]
+        # End of code modification
         self.output = preds[-1]
 
         loss_dict = OrderedDict()
         # pixel loss
         l_pix = 0.
-        for pred in preds:
-            l_pix += self.cri_pix(pred, self.gt)
+        # Code modification added by franmuline
+        if self.use_backbone:
+            for backbone_pred, pred in zip(backbone_preds, preds):
+                l_pix += self.cri_pix(pred, self.gt, backbone=backbone_pred)
+        else:
+            for pred in preds:
+                l_pix += self.cri_pix(pred, self.gt)
+        # End of code modification
 
         loss_dict['l_pix'] = l_pix
 
@@ -196,14 +215,24 @@ class ImageCleanModel(BaseModel):
         if hasattr(self, 'net_g_ema'):
             self.net_g_ema.eval()
             with torch.no_grad():
-                pred = self.net_g_ema(img)
+                # Code modification added by franmuline
+                if self.use_backbone:
+                    _, pred = self.net_g_ema(img)
+                else:
+                    pred = self.net_g_ema(img)
+                # End of code modification
             if isinstance(pred, list):
                 pred = pred[-1]
             self.output = pred
         else:
             self.net_g.eval()
             with torch.no_grad():
-                pred = self.net_g(img)
+                # Code modification added by franmuline
+                if self.use_backbone:
+                    _, pred = self.net_g(img)
+                else:
+                    pred = self.net_g(img)
+                # End of code modification
             if isinstance(pred, list):
                 pred = pred[-1]
             self.output = pred

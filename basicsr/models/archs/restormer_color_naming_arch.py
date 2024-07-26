@@ -319,24 +319,22 @@ class RestormerCN(nn.Module):
 ##---------- RestormerCN with the Backbone -----------------------
 class RestormerCNBackbone(nn.Module):
     def __init__(self,
-                 backbone_config,  ## Configuration for the Backbone
-                 main_net_config,  ## Configuration for the RestormerCN
+                 backbone,  ## Configuration for the Backbone
+                 main_net,  ## Configuration for the RestormerCN
                  num_categories=6,  ## Number of categories for the color naming model
                  return_backbone=False,  ## Boolean to return the output of the Backbone
                  ):
         super(RestormerCNBackbone, self).__init__()
 
-        if backbone_config['type'] == 'Backbone':
-            self.backbone = Backbone(**backbone_config['params'])
+        if backbone['type'] == 'Backbone':
+            self.backbone = Backbone(**backbone['params'])
         else:
             raise ValueError("The backbone type is not supported.")
 
         self.color_naming = ColorNaming(num_categories=num_categories)
 
-        if main_net_config['type'] == 'RestormerCN':
-            self.main_net = RestormerCN(**main_net_config['params'])
-        elif main_net_config['type'] == 'Restormer':
-            self.main_net = Restormer(**main_net_config['params'])
+        if main_net['type'] == 'RestormerCN':
+            self.main_net = RestormerCN(**main_net['params'])
         else:
             raise ValueError("The main_net type is not supported.")
 
@@ -345,6 +343,11 @@ class RestormerCNBackbone(nn.Module):
     def forward(self, x):
         x_backbone = self.backbone(x)
         cn_probs = self.color_naming(x_backbone)
+        # Color Naming returns a tensor with shape (C, B, H, W). We want (B, C, H, W)
+        cn_probs = cn_probs.permute(1, 0, 2, 3)
+        # We assert that the channels sum up to 1 (testing purposes)
+        # assert torch.allclose(cn_probs.sum(dim=1), torch.ones_like(cn_probs.sum(dim=1))), "The sum of the color naming maps must be 1."
+        cn_probs = cn_probs.float()
         # Concatenate the color naming maps to the input tensor
         x = torch.cat([x_backbone, cn_probs], dim=1)
         out = self.main_net(x)
