@@ -5,8 +5,10 @@ Implements the modified version of Restormer's color naming model.
 import torch
 import torch.nn as nn
 from einops import rearrange
-from .restormer_arch import LayerNorm, FeedForward, OverlapPatchEmbed, Downsample, Upsample, TransformerBlock
+from .restormer_arch import LayerNorm, FeedForward, OverlapPatchEmbed, Downsample, Upsample, TransformerBlock, Restormer
 from .arch_util import CustomSequential
+from .backbone import Backbone
+from basicsr.data.color_naming import ColorNaming
 
 
 ##########################################################################
@@ -311,6 +313,44 @@ class RestormerCN(nn.Module):
             return block(inp_img_enc, inp_cn_enc)[0]
         else:
             return block(inp_img_enc)
+
+
+##########################################################################
+##---------- RestormerCN with the Backbone -----------------------
+class RestormerCNBackbone(nn.Module):
+    def __init__(self,
+                 backbone_config,  ## Configuration for the Backbone
+                 main_net_config,  ## Configuration for the RestormerCN
+                 num_categories=6,  ## Number of categories for the color naming model
+                 return_backbone=False,  ## Boolean to return the output of the Backbone
+                 ):
+        super(RestormerCNBackbone, self).__init__()
+
+        if backbone_config['type'] == 'Backbone':
+            self.backbone = Backbone(**backbone_config['params'])
+        else:
+            raise ValueError("The backbone type is not supported.")
+
+        self.color_naming = ColorNaming(num_categories=num_categories)
+
+        if main_net_config['type'] == 'RestormerCN':
+            self.main_net = RestormerCN(**main_net_config['params'])
+        elif main_net_config['type'] == 'Restormer':
+            self.main_net = Restormer(**main_net_config['params'])
+        else:
+            raise ValueError("The main_net type is not supported.")
+
+        self.return_backbone = return_backbone
+
+    def forward(self, x):
+        x_backbone = self.backbone(x)
+        cn_probs = self.color_naming(x_backbone)
+        # Concatenate the color naming maps to the input tensor
+        x = torch.cat([x_backbone, cn_probs], dim=1)
+        out = self.main_net(x)
+        if self.return_backbone:
+            return x_backbone, out
+        return out
 
 
 if __name__ == "__main__":
