@@ -1,5 +1,5 @@
 # general settings
-name: PromptIR_FiveK_6
+name: RestormerCNBackbone_FiveK_6_3_cne_lf_1_0_max_relu
 model_type: ImageCleanModel
 scale: 1
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -52,17 +52,34 @@ datasets:
 
 # network structures
 network_g:
-  type: PromptIR
-  inp_channels: 9
-  out_channels: 3
-  dim: 48
-  num_blocks: [4,6,6,8]
-  num_refinement_blocks: 4
-  heads: [1,2,4,8]
-  ffn_expansion_factor: 2.66
-  bias: False
-  LayerNorm_type: WithBias
-  decoder: true
+  type: ModelCNBackbone
+  backbone:
+    type: Backbone
+    params:
+      input_channels: 3
+      output_channels: 3
+      encoder_dims: [ 4, 8, 16 ]
+      decoder_dims: [ 8, 4 ]
+  main_net:
+    type: RestormerCN
+    params:
+      inp_channels: 9
+      out_channels: 3
+      dim: 48
+      num_blocks: [ 4,6,6,8 ]
+      num_refinement_blocks: 4
+      heads: [ 1,2,4,8 ]
+      boolean_cne: [ false,true,true,true ]
+      cn_only: false
+      cn_as_value: false
+      max_pooling: true
+      cne_activation: relu
+      ffn_expansion_factor: 2.66
+      bias: False
+      LayerNorm_type: WithBias
+      dual_pixel_task: False
+  num_categories: 6
+  return_backbone: true
 
 
 # path
@@ -151,7 +168,3 @@ logger:
 dist_params:
   backend: nccl
   port: 29500
-
-# color naming settings
-color_naming:
-  num_categories: 6

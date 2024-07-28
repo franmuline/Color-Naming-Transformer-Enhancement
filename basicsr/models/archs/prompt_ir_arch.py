@@ -65,9 +65,14 @@ class PromptIR(nn.Module):
                  bias=False,
                  LayerNorm_type='WithBias',  ## Other option 'BiasFree'
                  decoder=False,
+                 color_naming=False,  ## True if using color naming maps
                  ):
 
         super(PromptIR, self).__init__()
+
+        # Code modification added by franmuline
+        self.color_naming = color_naming
+        # End of code modification
 
         self.patch_embed = OverlapPatchEmbed(inp_channels, dim)
 
@@ -198,6 +203,9 @@ class PromptIR(nn.Module):
 
         out_dec_level1 = self.refinement(out_dec_level1)
 
-        out_dec_level1 = self.output(out_dec_level1) + inp_img
+        if not self.color_naming:
+            out_dec_level1 = self.output(out_dec_level1) + inp_img
+        else:
+            out_dec_level1 = self.output(out_dec_level1) + inp_img[:, :3, :, :]
 
         return out_dec_level1
