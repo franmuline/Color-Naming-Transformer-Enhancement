@@ -7,8 +7,6 @@ import torch.nn as nn
 from einops import rearrange
 from .restormer_arch import LayerNorm, FeedForward, OverlapPatchEmbed, Downsample, Upsample, TransformerBlock, Restormer
 from .arch_util import CustomSequential
-from .backbone import Backbone
-from basicsr.data.color_naming import ColorNaming
 
 
 ##########################################################################
@@ -315,47 +313,6 @@ class RestormerCN(nn.Module):
             return block(inp_img_enc)
 
 
-##########################################################################
-##---------- RestormerCN with the Backbone -----------------------
-class RestormerCNBackbone(nn.Module):
-    def __init__(self,
-                 backbone,  ## Configuration for the Backbone
-                 main_net,  ## Configuration for the RestormerCN
-                 num_categories=6,  ## Number of categories for the color naming model
-                 return_backbone=False,  ## Boolean to return the output of the Backbone
-                 ):
-        super(RestormerCNBackbone, self).__init__()
-
-        if backbone['type'] == 'Backbone':
-            self.backbone = Backbone(**backbone['params'])
-        else:
-            raise ValueError("The backbone type is not supported.")
-
-        self.color_naming = ColorNaming(num_categories=num_categories)
-
-        if main_net['type'] == 'RestormerCN':
-            self.main_net = RestormerCN(**main_net['params'])
-        else:
-            raise ValueError("The main_net type is not supported.")
-
-        self.return_backbone = return_backbone
-
-    def forward(self, x):
-        x_backbone = self.backbone(x)
-        cn_probs = self.color_naming(x_backbone)
-        # Color Naming returns a tensor with shape (C, B, H, W). We want (B, C, H, W)
-        cn_probs = cn_probs.permute(1, 0, 2, 3)
-        # We assert that the channels sum up to 1 (testing purposes)
-        # assert torch.allclose(cn_probs.sum(dim=1), torch.ones_like(cn_probs.sum(dim=1))), "The sum of the color naming maps must be 1."
-        cn_probs = cn_probs.float()
-        # Concatenate the color naming maps to the input tensor
-        x = torch.cat([x_backbone, cn_probs], dim=1)
-        out = self.main_net(x)
-        if self.return_backbone:
-            return x_backbone, out
-        return out
-
-
 if __name__ == "__main__":
     model = RestormerCN(inp_channels=6, cne_activation='prelu').to('cuda')
     print(model)
@@ -364,4 +321,3 @@ if __name__ == "__main__":
     # Generate random input tensor with 6 channels with shape (1, 6, 256, 256) and values between 0 and 1
     inp = torch.rand((1, 6, 128, 128)).to('cuda')
     out = model(inp)
-

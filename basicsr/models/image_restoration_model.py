@@ -67,7 +67,7 @@ class ImageCleanModel(BaseModel):
             opt['network_g']['color_naming'] = True
 
         self.use_backbone = False
-        if 'backbone' in opt['network_g']:
+        if 'backbone' in opt['network_g'] and opt['network_g']['return_backbone']:
             self.use_backbone = True
             assert opt['train']['pixel_opt']['type'] == 'BackboneL2SSIMLoss', 'BackboneL2SSIMLoss is the only loss supported for backbone training'
         # End of code modification
