@@ -23,6 +23,11 @@ class ModelCNBackbone(nn.Module):
 
         if backbone['type'] == 'Backbone':
             self.backbone = Backbone(**backbone['params'])
+            if backbone['load_path']:
+                self.backbone.load_state_dict(torch.load(backbone['load_path']))
+            if backbone['freeze']:
+                for param in self.backbone.parameters():
+                    param.requires_grad = False
         else:
             raise ValueError("The backbone type is not supported.")
 
@@ -47,6 +52,12 @@ class ModelCNBackbone(nn.Module):
             self.main_net = PromptIR(**main_net['params'])
         else:
             raise ValueError("The main_net type is not supported.")
+
+        if main_net['load_path']:
+            self.main_net.load_state_dict(torch.load(main_net['load_path']))
+        if main_net['freeze']:
+            for param in self.main_net.parameters():
+                param.requires_grad = False
 
         self.return_backbone = return_backbone
 
