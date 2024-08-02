@@ -25,6 +25,7 @@ class PromptIRCN(nn.Module):
                  boolean_cne=[True, True, True],
                  max_pooling=False,
                  cne_activation='relu',
+                 use_cne_in_pgm=True,
                  ffn_expansion_factor=2.66,
                  bias=False,
                  LayerNorm_type='WithBias',  ## Other option 'BiasFree'
@@ -37,6 +38,7 @@ class PromptIRCN(nn.Module):
         assert any(boolean_cne), "At least one of the color naming encoders should be True. If not, use the PromptIR model"
 
         self.boolean_cne = boolean_cne
+        self.use_cne_in_pgm = use_cne_in_pgm
 
         assert (inp_channels == 9 or inp_channels == 14), "The input channels should be 9 or 14 for the color naming encoder"
 
@@ -151,12 +153,16 @@ class PromptIRCN(nn.Module):
         inp_img_enc_level4 = self.down3_4(out_enc_level3)
         latent = self.latent(inp_img_enc_level4)
         if self.decoder:
-            if self.boolean_cne[2]:
+            if self.boolean_cne[2] and self.use_cne_in_pgm:
                 dec3_param = self.prompt3(inp_cn_enc_level4)
             else:
                 dec3_param = self.prompt3(latent)
 
-            latent = torch.cat([latent, dec3_param], 1)
+            if self.use_cne_in_pgm:
+                latent = torch.cat([latent, dec3_param], 1)
+            else:
+                latent = torch.cat([inp_cn_enc_level4, dec3_param], 1)
+
             latent = self.noise_level3(latent)
             latent = self.reduce_noise_level3(latent)
 
@@ -167,11 +173,15 @@ class PromptIRCN(nn.Module):
 
         out_dec_level3 = self.decoder_level3(inp_dec_level3)
         if self.decoder:
-            if self.boolean_cne[1]:
+            if self.boolean_cne[1] and self.use_cne_in_pgm:
                 dec2_param = self.prompt2(inp_cn_enc_level3)
             else:
                 dec2_param = self.prompt2(out_dec_level3)
-            out_dec_level3 = torch.cat([out_dec_level3, dec2_param], 1)
+
+            if self.use_cne_in_pgm:
+                out_dec_level3 = torch.cat([out_dec_level3, dec2_param], 1)
+            else:
+                out_dec_level3 = torch.cat([inp_cn_enc_level3, dec2_param], 1)
             out_dec_level3 = self.noise_level2(out_dec_level3)
             out_dec_level3 = self.reduce_noise_level2(out_dec_level3)
 
@@ -181,11 +191,16 @@ class PromptIRCN(nn.Module):
 
         out_dec_level2 = self.decoder_level2(inp_dec_level2)
         if self.decoder:
-            if self.boolean_cne[0]:
+            if self.boolean_cne[0] and self.use_cne_in_pgm:
                 dec1_param = self.prompt1(inp_cn_enc_level2)
             else:
                 dec1_param = self.prompt1(out_dec_level2)
-            out_dec_level2 = torch.cat([out_dec_level2, dec1_param], 1)
+
+            if self.use_cne_in_pgm:
+                out_dec_level2 = torch.cat([out_dec_level2, dec1_param], 1)
+            else:
+                out_dec_level2 = torch.cat([inp_cn_enc_level2, dec1_param], 1)
+
             out_dec_level2 = self.noise_level1(out_dec_level2)
             out_dec_level2 = self.reduce_noise_level1(out_dec_level2)
 
