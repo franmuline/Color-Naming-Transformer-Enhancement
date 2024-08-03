@@ -1,5 +1,5 @@
 # general settings
-name: RestormerCN_FiveK_6_3_cne_lf_1_2_max_relu
+name: RestormerCN_FiveK_6_3_cne_lf_1_2_max_relu_no_seed
 model_type: ImageCleanModel
 scale: 1
 num_gpu: 1  # set num_gpu: 0 for cpu mode

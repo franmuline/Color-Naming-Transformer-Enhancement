@@ -1,5 +1,5 @@
 # general settings
-name: Restormer_FiveK_baseline
+name: Restormer_FiveK_baseline_no_seed
 model_type: ImageCleanModel
 scale: 1
 num_gpu: 1  # set num_gpu: 0 for cpu mode
