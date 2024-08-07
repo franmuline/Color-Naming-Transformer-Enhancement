@@ -264,7 +264,7 @@ class ImageCleanModel(BaseModel):
 
         cnt = 0
 
-        for idx, val_data in enumerate(dataloader):
+        for idx, val_data in enumerate(tqdm(dataloader)):
             img_name = osp.splitext(osp.basename(val_data['lq_path'][0]))[0]
 
             self.feed_data(val_data)
@@ -319,9 +319,6 @@ class ImageCleanModel(BaseModel):
                             metric_module, metric_type)(visuals['result'], visuals['gt'], **opt_)
 
             cnt += 1
-            if cnt % 100 == 0:
-                logger = get_root_logger()
-                logger.info(f'Performing validation, current sample: {cnt} / {len(dataloader)}')
 
         current_metric = 0.
         if with_metrics:
