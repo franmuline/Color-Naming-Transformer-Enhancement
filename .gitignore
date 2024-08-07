@@ -4,3 +4,4 @@
 /basicsr/tb_logger
 /results
 *wandb*
+/scripts/color_naming_maps
