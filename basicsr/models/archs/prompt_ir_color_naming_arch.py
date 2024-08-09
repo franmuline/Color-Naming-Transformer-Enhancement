@@ -5,9 +5,9 @@ Implements the modified version of PromptIR's color naming model.
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from basicsr.models.archs.cne import chose_encoder
 from basicsr.models.archs.restormer_arch import TransformerBlock, OverlapPatchEmbed, Downsample, Upsample
-from basicsr.models.archs.restormer_color_naming_arch import CNEncoderLayer, choose_sequential_type, transformer_block_forward
+from basicsr.models.archs.restormer_color_naming_arch import choose_sequential_type, transformer_block_forward
 from basicsr.models.archs.prompt_ir_arch import PromptGenBlock
 
 
@@ -22,6 +22,7 @@ class PromptIRCN(nn.Module):
                  num_blocks=[4, 6, 6, 8],
                  num_refinement_blocks=4,
                  heads=[1, 2, 4, 8],
+                 cne_type='basic',
                  boolean_cne_prompt=[True, True, True],  # Ordered by depth, from shallow to deep, not by their order in the network.
                  boolean_cne_encoder=[True, True, True, True, False, False],
                  cn_only=False,
@@ -50,6 +51,7 @@ class PromptIRCN(nn.Module):
         assert any(boolean_cne_prompt) or any(boolean_cne_encoder), "There must be at least one True value in the " \
                                                                         "boolean_cne_prompt or boolean_cne_encoder lists. Otherwise, use the PromptIR, the Restormer or the RestormerCN models."
 
+        cne_encoder_type = chose_encoder(cne_type)
         self.boolean_cne_prompt = boolean_cne_prompt
         self.boolean_cne_encoder = boolean_cne_encoder
         self.use_cne_in_pgm = use_cne_in_pgm
@@ -64,15 +66,15 @@ class PromptIRCN(nn.Module):
         if boolean_cne_prompt[0] or boolean_cne_prompt[1] or boolean_cne_prompt[2] \
                 or boolean_cne_encoder[1] or boolean_cne_encoder[2] or boolean_cne_encoder[3] or \
                 boolean_cne_encoder[4] or boolean_cne_encoder[5]:
-            self.cne_1_2 = CNEncoderLayer(int(dim), int(dim * 2 ** 1), max_pooling=max_pooling,
-                                          activation=cne_activation)  # First CNE layer (from level 1 to level 2)
+            self.cne_1_2 = cne_encoder_type(int(dim), int(dim * 2 ** 1), max_pooling=max_pooling,
+                                     activation=cne_activation)  # First CNE layer (from level 1 to level 2)
         if boolean_cne_prompt[1] or boolean_cne_prompt[2] or boolean_cne_encoder[2] or boolean_cne_encoder[3] or \
                 boolean_cne_encoder[4]:
-            self.cne_2_3 = CNEncoderLayer(int(dim * 2 ** 1), int(dim * 2 ** 2), max_pooling=max_pooling,
-                                          activation=cne_activation)
+            self.cne_2_3 = cne_encoder_type(int(dim * 2 ** 1), int(dim * 2 ** 2), max_pooling=max_pooling,
+                                     activation=cne_activation)
         if boolean_cne_prompt[2] or boolean_cne_encoder[3]:
-            self.cne_3_4 = CNEncoderLayer(int(dim * 2 ** 2), int(dim * 2 ** 3), max_pooling=max_pooling,
-                                          activation=cne_activation)
+            self.cne_3_4 = cne_encoder_type(int(dim * 2 ** 2), int(dim * 2 ** 3), max_pooling=max_pooling,
+                                     activation=cne_activation)
 
         if self.decoder:
             self.prompt1 = PromptGenBlock(prompt_dim=64, prompt_len=5, prompt_size=64, lin_dim=96)

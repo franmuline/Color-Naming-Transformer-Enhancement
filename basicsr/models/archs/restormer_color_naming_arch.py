@@ -5,6 +5,7 @@ Implements the modified version of Restormer's color naming model.
 import torch
 import torch.nn as nn
 from einops import rearrange
+from .cne import chose_encoder, CNEncoder
 from .restormer_arch import LayerNorm, FeedForward, OverlapPatchEmbed, Downsample, Upsample, TransformerBlock, Restormer
 from .arch_util import CustomSequential
 
@@ -49,57 +50,6 @@ def transformer_block_forward(inp_img_enc, inp_cn_enc, block, cne):
         return block(inp_img_enc, inp_cn_enc)[0]
     else:
         return block(inp_img_enc)
-
-
-##########################################################################
-## CNE: Color Naming Encoder
-class CNEncoderLayer(nn.Module):
-    """
-    Encoder layer for a Color Naming encoder. It is a simple convolutional layer with a ReLU activation and a max
-    pooling layer. Its only purpose is to reduce the spatial dimensions of the input tensor
-    (which will be the color naming maps) extracting meaningful features.
-    The convolutional layer receives an input with the form (B, Cin, H, W) and returns an output with the form
-    (B, Cout, H/pooling_factor, W/pooling_factor).
-    """
-    def __init__(self, in_channels, out_channels, pooling_factor=2, max_pooling=True, activation='relu'):
-        super(CNEncoderLayer, self).__init__()
-        if pooling_factor % 2 != 0:
-            raise ValueError("The pooling factor must be an even number.")
-
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
-
-        if activation == 'relu':
-            self.activation = nn.ReLU()
-        elif activation == 'leaky_relu':
-            self.activation = nn.LeakyReLU(negative_slope=0.01)
-        elif activation == 'prelu':
-            self.activation = nn.PReLU()
-        elif activation == 'gelu':
-            self.activation = nn.GELU()
-        elif activation == 'elu':
-            self.activation = nn.ELU()
-        elif activation == 'selu':
-            self.activation = nn.SELU()
-        elif activation == 'sigmoid':
-            self.activation = nn.Sigmoid()
-        elif activation == 'tanh':
-            self.activation = nn.Tanh()
-        elif activation == 'swish':
-            self.activation = nn.SiLU()
-        elif activation == 'none':
-            self.activation = nn.Identity()
-        else:
-            raise ValueError("Unsupported activation function")
-        if max_pooling:
-            self.pool = nn.MaxPool2d(kernel_size=pooling_factor, stride=pooling_factor)
-        else:
-            self.pool = nn.AvgPool2d(kernel_size=pooling_factor, stride=pooling_factor)
-
-    def forward(self, x):
-        x = self.conv(x)
-        x = self.activation(x)
-        x = self.pool(x)
-        return x
 
 
 ##########################################################################
@@ -198,6 +148,7 @@ class RestormerCN(nn.Module):
                  num_blocks=[4, 6, 6, 8],
                  num_refinement_blocks=4,
                  heads=[1, 2, 4, 8],
+                 cne_type='basic',  ## Type of CNE layer to use. Options: 'basic' or 'inception'
                  boolean_cne=[True, True, True, True, False, False],  ## Boolean list to include the CNE layers in the encoder part of the model
                  cn_only=False,  ## Boolean to use CN maps ONLY as query or value in attention (it is summed to query or value otherwise)
                  cn_as_value=False,  ## Boolean to use the color naming maps as the value in the attention mechanism. It is used as the query otherwise
@@ -222,6 +173,8 @@ class RestormerCN(nn.Module):
         assert any(boolean_cne), ("There must be at least one CNE layer in the model. Use the original Restormer model "
                                   "if color mappings are not going to be used.")
 
+        cn_encoder_type = chose_encoder(cne_type)
+
         self.boolean_cne = boolean_cne
 
         self.image_patch_embed = OverlapPatchEmbed(3, dim)
@@ -229,17 +182,17 @@ class RestormerCN(nn.Module):
 
         self.encoder_level1 = choose_sequential_type(dim, heads[0], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[0], boolean_cne[0], cn_only=cn_only, cn_as_value=cn_as_value)
 
-        self.cne_1_2 = CNEncoderLayer(int(dim), int(dim*2**1), max_pooling=max_pooling, activation=cne_activation)  # First CNE layer (from level 1 to level 2)
+        self.cne_1_2 = cn_encoder_type(int(dim), int(dim * 2 ** 1), max_pooling=max_pooling, activation=cne_activation)  # First CNE layer (from level 1 to level 2)
 
         self.down_1_2 = Downsample(dim)  ## From Level 1 to Level 2
         self.encoder_level2 = choose_sequential_type(int(dim*2**1), heads[1], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[1], boolean_cne[1], cn_only=cn_only, cn_as_value=cn_as_value)
 
-        self.cne_2_3 = CNEncoderLayer(int(dim * 2 ** 1), int(dim * 2 ** 2), max_pooling=max_pooling, activation=cne_activation)  # Second CNE layer (from level 2 to level 3)
+        self.cne_2_3 = cn_encoder_type(int(dim * 2 ** 1), int(dim * 2 ** 2), max_pooling=max_pooling, activation=cne_activation)  # Second CNE layer (from level 2 to level 3)
 
         self.down2_3 = Downsample(int(dim * 2 ** 1))  ## From Level 2 to Level 3
         self.encoder_level3 = choose_sequential_type(int(dim*2**2), heads[2], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[2], boolean_cne[2], cn_only=cn_only, cn_as_value=cn_as_value)
 
-        self.cne_3_4 = CNEncoderLayer(int(dim * 2 ** 2), int(dim * 2 ** 3), max_pooling=max_pooling, activation=cne_activation)  # Third CNE layer (from level 3 to level 4)
+        self.cne_3_4 = cn_encoder_type(int(dim * 2 ** 2), int(dim * 2 ** 3), max_pooling=max_pooling, activation=cne_activation)  # Third CNE layer (from level 3 to level 4)
 
         self.down3_4 = Downsample(int(dim * 2 ** 2))  ## From Level 3 to Level 4
         self.latent = choose_sequential_type(int(dim*2**3), heads[3], ffn_expansion_factor, bias, LayerNorm_type, num_blocks[3], boolean_cne[3], cn_only=cn_only, cn_as_value=cn_as_value)
@@ -271,8 +224,16 @@ class RestormerCN(nn.Module):
     def forward(self, inp):
         # Assert that input batch has to have more than 3 channels
         # (3 for the image and the rest for the color naming maps)
-        assert inp.shape[1] > 3, ("The input tensor must have more than 3 channels. Use the original Restormer "
+        assert inp.shape[1] == 9 or inp.shape[1] == 14, ("The input tensor must have more than 9 or 14 channels. Use the original Restormer "
                                   "model for 3-channel inputs.")
+
+        # For testing purposes, print the weights of the first layer of the model
+        # print(self.image_patch_embed.proj.weight)
+        # if type(self.cne_1_2) == CNEncoder:
+        #    print(self.cne_1_2.conv.weight)
+        # elif type(self.cne_1_2) == CNEncoderInceptionBlock:
+        #    print(self.cne_1_2.conv1x1.weight)
+
         inp_img, cn_maps = inp[:, :3, ...], inp[:, 3:, ...]
 
         inp_img_enc_level1 = self.image_patch_embed(inp_img)
