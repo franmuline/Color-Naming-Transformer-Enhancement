@@ -72,7 +72,7 @@ network_g:
       num_refinement_blocks: 4
       heads: [ 1,2,4,8 ]
       boolean_cne_prompt: [ true,true,true ]  # Ordered by depth, from shallow to deep, not by their order in the network.
-      boolean_cne_encoder: [ false, false, false, false, false, false ]
+      boolean_cne_encoder: [false, true, true, true, false, false]
       cn_only: false
       cn_as_value: false
       max_pooling: true
