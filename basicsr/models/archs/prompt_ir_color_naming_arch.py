@@ -23,6 +23,7 @@ class PromptIRCN(nn.Module):
                  num_refinement_blocks=4,
                  heads=[1, 2, 4, 8],
                  cne_type='basic',
+                 squeeze_ratio=None,  # Only for the CNEncoderSqueeze
                  boolean_cne_prompt=[True, True, True],  # Ordered by depth, from shallow to deep, not by their order in the network.
                  boolean_cne_encoder=[True, True, True, True, False, False],
                  cn_only=False,
@@ -51,7 +52,14 @@ class PromptIRCN(nn.Module):
         assert any(boolean_cne_prompt) or any(boolean_cne_encoder), "There must be at least one True value in the " \
                                                                         "boolean_cne_prompt or boolean_cne_encoder lists. Otherwise, use the PromptIR, the Restormer or the RestormerCN models."
 
-        cne_encoder_type = chose_encoder(cne_type)
+        cn_encoder_type = chose_encoder(cne_type)
+        encoder_kwargs = {'in_channels': None, 'out_channels': None, 'pooling_factor': 2, 'max_pooling': max_pooling,
+                          'activation': cne_activation}
+
+        if cne_type == 'squeeze':
+            assert squeeze_ratio is not None, "The squeeze ratio must be defined for the CNEncoderSqueeze type."
+            encoder_kwargs['squeeze_ratio'] = squeeze_ratio
+
         self.boolean_cne_prompt = boolean_cne_prompt
         self.boolean_cne_encoder = boolean_cne_encoder
         self.use_cne_in_pgm = use_cne_in_pgm
@@ -66,15 +74,15 @@ class PromptIRCN(nn.Module):
         if boolean_cne_prompt[0] or boolean_cne_prompt[1] or boolean_cne_prompt[2] \
                 or boolean_cne_encoder[1] or boolean_cne_encoder[2] or boolean_cne_encoder[3] or \
                 boolean_cne_encoder[4] or boolean_cne_encoder[5]:
-            self.cne_1_2 = cne_encoder_type(int(dim), int(dim * 2 ** 1), max_pooling=max_pooling,
-                                     activation=cne_activation)  # First CNE layer (from level 1 to level 2)
+            encoder_kwargs['in_channels'] = int(dim); encoder_kwargs['out_channels'] = int(dim * 2 ** 1)
+            self.cne_1_2 = cn_encoder_type(**encoder_kwargs)  # First CNE layer (from level 1 to level 2)
         if boolean_cne_prompt[1] or boolean_cne_prompt[2] or boolean_cne_encoder[2] or boolean_cne_encoder[3] or \
                 boolean_cne_encoder[4]:
-            self.cne_2_3 = cne_encoder_type(int(dim * 2 ** 1), int(dim * 2 ** 2), max_pooling=max_pooling,
-                                     activation=cne_activation)
+            encoder_kwargs['in_channels'] = int(dim * 2 ** 1); encoder_kwargs['out_channels'] = int(dim * 2 ** 2)
+            self.cne_2_3 = cn_encoder_type(**encoder_kwargs)  # Second CNE layer (from level 2 to level 3)
         if boolean_cne_prompt[2] or boolean_cne_encoder[3]:
-            self.cne_3_4 = cne_encoder_type(int(dim * 2 ** 2), int(dim * 2 ** 3), max_pooling=max_pooling,
-                                     activation=cne_activation)
+            encoder_kwargs['in_channels'] = int(dim * 2 ** 2); encoder_kwargs['out_channels'] = int(dim * 2 ** 3)
+            self.cne_3_4 = cn_encoder_type(**encoder_kwargs)  # Third CNE layer (from level 3 to level 4)
 
         if self.decoder:
             self.prompt1 = PromptGenBlock(prompt_dim=64, prompt_len=5, prompt_size=64, lin_dim=96)
