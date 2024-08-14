@@ -1,5 +1,5 @@
 # general settings
-name: PromptIRBackbone_FiveK_1_0
+name: PromptIRCNBackbone_FiveK_6_3_cne_lf_1_0_max_relu_pgm_inception
 model_type: ImageCleanModel
 scale: 1
 num_gpu: 1  # set num_gpu: 0 for cpu mode
@@ -63,21 +63,29 @@ network_g:
     load_path: ~
     freeze: false
   main_net:
-    type: PromptIR
+    type: PromptIRCN
     params:
-      inp_channels: 3
+      inp_channels: 9
       out_channels: 3
       dim: 48
       num_blocks: [ 4,6,6,8 ]
       num_refinement_blocks: 4
       heads: [ 1,2,4,8 ]
+      cne_type: inception
+      boolean_cne_prompt: [ true,true,true ]  # Ordered by depth, from shallow to deep, not by their order in the network.
+      boolean_cne_encoder: [false, true, true, true, false, false]
+      cn_only: false
+      cn_as_value: false
+      max_pooling: true
+      cne_activation: relu
+      use_cne_in_pgm: true
       ffn_expansion_factor: 2.66
       bias: False
       LayerNorm_type: WithBias
       decoder: true
     load_path: ~
     freeze: false
-  num_categories: 0
+  num_categories: 6
   return_backbone: true
 
 
