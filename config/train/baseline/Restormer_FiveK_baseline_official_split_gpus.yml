@@ -1,5 +1,5 @@
 # general settings
-name: Restormer_FiveK_baseline_official_split_1
+name: Restormer_FiveK_baseline_official_split_gpus
 model_type: ImageCleanModel
 scale: 1
 num_gpu: 2  # set num_gpu: 0 for cpu mode
