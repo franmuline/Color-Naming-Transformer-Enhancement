@@ -1,8 +1,8 @@
 # general settings
-name: Restormer_FiveK_baseline_official_split_gpus
+name: PromptIRCN_FiveK_6_3_cne_1_2_pgm_inception_cne_not_in_prompt
 model_type: ImageCleanModel
 scale: 1
-num_gpu: 2  # set num_gpu: 0 for cpu mode
+num_gpu: 1  # set num_gpu: 0 for cpu mode
 manual_seed: 100
 
 # dataset and data loader settings
@@ -12,7 +12,7 @@ datasets:
     type: Dataset_PairedImage
     dataroot_gt: ../../Datasets/FiveK/expertC_gt
     dataroot_lq: ../../Datasets/FiveK/input
-    partitions: ../../Datasets/FiveK/UEGAN_partition
+    partitions: ../../Datasets/FiveK/Ours
     geometric_augs: true
 
     filename_tmpl: '{}'
@@ -46,23 +46,32 @@ datasets:
     type: Dataset_PairedImage
     dataroot_gt: ../../Datasets/FiveK/expertC_gt
     dataroot_lq: ../../Datasets/FiveK/input
-    partitions: ../../Datasets/FiveK/UEGAN_partition
+    partitions: ../../Datasets/FiveK/Ours
     io_backend:
       type: disk
 
 # network structures
 network_g:
-  type: Restormer
-  inp_channels: 3
+  type: PromptIRCN
+  inp_channels: 9
   out_channels: 3
   dim: 48
   num_blocks: [4,6,6,8]
   num_refinement_blocks: 4
   heads: [1,2,4,8]
+  cne_type: squeeze
+  squeeze_ratio: 8
+  boolean_cne_prompt: [false, false, false]  # Ordered by depth, from shallow to deep, not by their order in the network.
+  boolean_cne_encoder: [false, true, true, true, false, false]
+  cn_only: false
+  cn_as_value: false
+  max_pooling: true
+  cne_activation: relu
+  use_cne_in_pgm: true
   ffn_expansion_factor: 2.66
   bias: False
   LayerNorm_type: WithBias
-  dual_pixel_task: False
+  decoder: true
 
 
 # path
@@ -77,15 +86,15 @@ train:
   warmup_iter: -1 # no warm up
   use_grad_clip: true
 
-  # Split 300k iterations into two cycles. 
-  # 1st cycle: fixed 3e-4 LR for 92k iters. 
+  # Split 300k iterations into two cycles.
+  # 1st cycle: fixed 3e-4 LR for 92k iters.
   # 2nd cycle: cosine annealing (3e-4 to 1e-6) for 208k iters.
   scheduler:
     type: CosineAnnealingRestartCyclicLR
-    periods: [92000, 208000]       
+    periods: [92000, 208000]
     restart_weights: [1,1]
-    eta_mins: [0.0003,0.000001]   
-  
+    eta_mins: [0.0003,0.000001]
+
   mixing_augs:
     mixup: false
     mixup_beta: 1.2
@@ -96,7 +105,7 @@ train:
     lr: !!float 3e-4
     weight_decay: !!float 1e-4
     betas: [0.9, 0.999]
-  
+
   # losses
   pixel_opt:
     type: BackboneL2SSIMLoss
@@ -151,3 +160,7 @@ logger:
 dist_params:
   backend: nccl
   port: 29500
+
+# color naming settings
+color_naming:
+  num_categories: 6
