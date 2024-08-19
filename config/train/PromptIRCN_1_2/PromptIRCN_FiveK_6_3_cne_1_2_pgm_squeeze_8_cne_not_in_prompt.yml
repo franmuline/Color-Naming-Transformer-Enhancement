@@ -1,5 +1,5 @@
 # general settings
-name: PromptIRCN_FiveK_6_3_cne_1_2_pgm_inception_cne_not_in_prompt
+name: PromptIRCN_FiveK_6_3_cne_1_2_pgm_squeeze_8_cne_not_in_prompt
 model_type: ImageCleanModel
 scale: 1
 num_gpu: 1  # set num_gpu: 0 for cpu mode
