@@ -124,13 +124,18 @@ class Dataset_PairedImage(data.Dataset):
 
         # augmentation for training
         if self.opt['phase'] == 'train':
-            gt_size = self.opt['gt_size']
-            # padding
-            img_gt, img_lq = padding(img_gt, img_lq, gt_size)
+            if 'use_original_size' not in self.opt or not self.opt['use_original_size']:
+                gt_size = self.opt['gt_size']
+                # padding
+                img_gt, img_lq = padding(img_gt, img_lq, gt_size)
 
-            # random crop
-            img_gt, img_lq = paired_random_crop(img_gt, img_lq, gt_size, scale,
-                                                gt_path)
+                # random crop
+                img_gt, img_lq = paired_random_crop(img_gt, img_lq, gt_size, scale,
+                                                    gt_path)
+            else:
+                # We need the size of the images to be a multiple of 8, so we cut the images to the nearest multiple of 8
+                img_gt = img_gt[:img_gt.shape[0]//8*8, :img_gt.shape[1]//8*8]
+                img_lq = img_lq[:img_lq.shape[0]//8*8, :img_lq.shape[1]//8*8]
 
             # flip, rotation augmentations
             if self.geometric_augs:
