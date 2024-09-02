@@ -14,6 +14,7 @@ metric_module = importlib.import_module('basicsr.metrics')
 
 import os
 import random
+import pandas
 import numpy as np
 import cv2
 import torch.nn.functional as F
@@ -238,14 +239,14 @@ class ImageCleanModel(BaseModel):
             self.output = pred
             self.net_g.train()
 
-    def dist_validation(self, dataloader, current_iter, tb_logger, save_img, rgb2bgr, use_image):
+    def dist_validation(self, dataloader, current_iter, tb_logger, save_img, rgb2bgr, use_image, save_metrics):
         if os.environ['LOCAL_RANK'] == '0':
-            return self.nondist_validation(dataloader, current_iter, tb_logger, save_img, rgb2bgr, use_image)
+            return self.nondist_validation(dataloader, current_iter, tb_logger, save_img, rgb2bgr, use_image, save_metrics)
         else:
             return 0.
 
     def nondist_validation(self, dataloader, current_iter, tb_logger,
-                           save_img, rgb2bgr, use_image):
+                           save_img, rgb2bgr, use_image, save_metrics):
         dataset_name = dataloader.dataset.opt['name']
         with_metrics = self.opt['val'].get('metrics') is not None
         if with_metrics:
@@ -263,6 +264,14 @@ class ImageCleanModel(BaseModel):
             test = self.nonpad_test
 
         cnt = 0
+
+        # If save_metrics is true, we create a table with pandas and write the metrics to a csv file
+        if save_metrics:
+            csv_rows = []
+            first_csv_row = ['image_name']
+            for metric in self.metric_results.keys():
+                first_csv_row.append(metric)
+            csv_rows.append(first_csv_row)
 
         for idx, val_data in enumerate(tqdm(dataloader)):
             img_name = osp.splitext(osp.basename(val_data['lq_path'][0]))[0]
@@ -308,18 +317,37 @@ class ImageCleanModel(BaseModel):
                 # calculate metrics
                 opt_metric = deepcopy(self.opt['val']['metrics'])
                 if use_image:
+                    if save_metrics:
+                        cvs_row = [img_name]
                     for name, opt_ in opt_metric.items():
                         metric_type = opt_.pop('type')
-                        self.metric_results[name] += getattr(
+                        metric_result = getattr(
                             metric_module, metric_type)(sr_img, gt_img, **opt_)
+                        self.metric_results[name] += metric_result
+                        # If save_metrics is true, we write the metrics to the csv file
+                        if save_metrics:
+                            cvs_row.append(metric_result)
+                    if save_metrics:
+                        csv_rows.append(cvs_row)
+
                 else:
+                    if save_metrics:
+                        cvs_row = [img_name]
                     for name, opt_ in opt_metric.items():
                         metric_type = opt_.pop('type')
-                        self.metric_results[name] += getattr(
+                        metric_result = getattr(
                             metric_module, metric_type)(visuals['result'], visuals['gt'], **opt_)
+                        self.metric_results[name] += metric_result
+                        if save_metrics:
+                            cvs_row.append(metric_result)
+                    if save_metrics:
+                        csv_rows.append(cvs_row)
 
             cnt += 1
 
+        if save_metrics:
+            df = pandas.DataFrame(csv_rows[1:], columns=csv_rows[0])
+            df.to_csv(osp.join(self.opt['path']['results_root'], f'image_metrics.csv'), index=False)
         current_metric = 0.
         if with_metrics:
             for metric in self.metric_results.keys():

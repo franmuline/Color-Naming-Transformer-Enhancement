@@ -34,7 +34,7 @@ class BaseModel():
         """Save networks and training state."""
         pass
 
-    def validation(self, dataloader, current_iter, tb_logger, save_img=False, rgb2bgr=True, use_image=True):
+    def validation(self, dataloader, current_iter, tb_logger, save_img=False, rgb2bgr=True, use_image=True, save_metrics=False):
         """Validation function.
 
         Args:
@@ -46,10 +46,10 @@ class BaseModel():
             use_image (bool): Whether to use saved images to compute metrics (PSNR, SSIM), if not, then use data directly from network' output. Default: True
         """
         if self.opt['dist']:
-            return self.dist_validation(dataloader, current_iter, tb_logger, save_img, rgb2bgr, use_image)
+            return self.dist_validation(dataloader, current_iter, tb_logger, save_img, rgb2bgr, use_image, save_metrics)
         else:
             return self.nondist_validation(dataloader, current_iter, tb_logger,
-                                    save_img, rgb2bgr, use_image)
+                                    save_img, rgb2bgr, use_image, save_metrics)
 
     def model_ema(self, decay=0.999):
         net_g = self.get_bare_model(self.net_g)

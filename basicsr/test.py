@@ -63,12 +63,13 @@ def main():
         rgb2bgr = opt['val'].get('rgb2bgr', True)
         # wheather use uint8 image to compute metrics
         use_image = opt['val'].get('use_image', True)
+        save_metrics = opt['val'].get('save_metrics', False)
         model.validation(
             test_loader,
             current_iter=opt['name'],
             tb_logger=None,
             save_img=opt['val']['save_img'],
-            rgb2bgr=rgb2bgr, use_image=use_image)
+            rgb2bgr=rgb2bgr, use_image=use_image, save_metrics=save_metrics)
 
 
 if __name__ == '__main__':
