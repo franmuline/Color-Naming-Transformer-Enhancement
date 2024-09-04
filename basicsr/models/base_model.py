@@ -123,6 +123,10 @@ class BaseModel():
                 self.schedulers.append(
                     lr_scheduler.LinearLR(
                         optimizer, train_opt['total_iter']))
+        elif scheduler_type == 'ConstantLR':
+            for optimizer in self.optimizers:
+                self.schedulers.append(
+                    lr_scheduler.ConstantLR(optimizer))
         elif scheduler_type == 'VibrateLR':
             for optimizer in self.optimizers:
                 self.schedulers.append(

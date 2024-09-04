@@ -46,6 +46,21 @@ class MultiStepRestartLR(_LRScheduler):
             for group in self.optimizer.param_groups
         ]
 
+class ConstantLR(_LRScheduler):
+    """ Constant learning rate scheme.
+
+    Args:
+        optimizer (torch.nn.optimizer): Torch optimizer.
+        last_epoch (int): Used in _LRScheduler. Default: -1.
+    """
+
+    def __init__(self, optimizer, last_epoch=-1):
+        super(ConstantLR, self).__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        return [group['initial_lr'] for group in self.optimizer.param_groups]
+
+
 class LinearLR(_LRScheduler):
     """
 
