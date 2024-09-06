@@ -1,15 +1,16 @@
 # Image Enhancement using Color Naming in Transformer-Based Models
 
 <hr />
+
 > **Abstract:** *Color naming, the process of categorizing colors into 
-universal terms, plays a significant role in how humans perceive and 
-describe images. Leveraging this concept, this thesis integrates color 
-naming probability maps into transformer-based models to enhance image 
-retouching. By embedding these maps into the deep learning pipeline of 
-models like Restormer and PromptIR, the study aims to replicate the 
-nuanced adjustments made by expert retouchers. The results demonstrate 
-that incorporating color naming improves color accuracy and visual 
-quality, providing a novel approach to automated image enhancement.*
+> universal terms, plays a significant role in how humans perceive and 
+> describe images. Leveraging this concept, this thesis integrates color 
+> naming probability maps into transformer-based models to enhance image 
+> retouching. By embedding these maps into the deep learning pipeline of 
+> models like Restormer and PromptIR, the study aims to replicate the 
+> nuanced adjustments made by expert retouchers. The results demonstrate 
+> that incorporating color naming improves color accuracy and visual 
+> quality, providing a novel approach to automated image enhancement.* 
 <hr />
 
 ## Overview
