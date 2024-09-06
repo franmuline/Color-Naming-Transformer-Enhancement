@@ -1,5 +1,17 @@
 # Image Enhancement using Color Naming in Transformer-Based Models
 
+<hr />
+> **Abstract:** *Color naming, the process of categorizing colors into 
+universal terms, plays a significant role in how humans perceive and 
+describe images. Leveraging this concept, this thesis integrates color 
+naming probability maps into transformer-based models to enhance image 
+retouching. By embedding these maps into the deep learning pipeline of 
+models like Restormer and PromptIR, the study aims to replicate the 
+nuanced adjustments made by expert retouchers. The results demonstrate 
+that incorporating color naming improves color accuracy and visual 
+quality, providing a novel approach to automated image enhancement.*
+<hr />
+
 ## Overview
 
 This repository contains the implementation of the methods proposed 
@@ -61,4 +73,38 @@ as PSNR, SSIM, and color difference metrics (ΔE00 and ΔEab).
 ## Getting started
 
 ### Environment setup
+
+Follow the steps below to set up the environment: 
+
+1. Clone the repository:
+
+```bash
+git clone 
+```
+
+2. Make conda environment: 
+
+```bash
+conda create -n tfm_env python=3.10
+conda activate tfm_env
+```
+
+3. Install the pytorch packages (follow the instructions in the [Pytorch website](https://pytorch.org/get-started/locally/)): 
+
+```bash
+conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+```
+
+4. Install the required packages: 
+
+```bash
+pip install matplotlib scikit-learn scikit-image opencv-python yacs joblib natsort h5py tqdm
+pip install einops gdown addict future lmdb numpy pyyaml requests scipy tb-nightly yapf lpips
+pip install torchmetrics pandas
+```
+
+
+
+
+
 
