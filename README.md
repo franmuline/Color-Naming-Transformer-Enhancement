@@ -104,6 +104,23 @@ pip install einops gdown addict future lmdb numpy pyyaml requests scipy tb-night
 pip install torchmetrics pandas
 ```
 
+### Training the models
+
+To train the models, execute the train.py script and pass the configuration file as an argument. The configuration files can be found in the "config/train" directory. 
+
+```bash
+python train.py -opt config/train/baseline/Restormer_FiveK_baseline_official_split_2.yml
+```
+
+### Testing the models
+
+To test the models, execute the test.py script and pass the configuration file as an argument. The configuration files can be found in the "config/test" directory. 
+
+```bash
+python test.py -opt config/test/Restormer_FiveK_baseline_official_split_2.yml
+```
+
+
 
 
 
