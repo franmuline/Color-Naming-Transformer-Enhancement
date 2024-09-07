@@ -135,9 +135,10 @@ class deltaEab():
 
 
 class deltaE00():
-    def __init__(self, color_chart_area=0):
+    def __init__(self, color_chart_area=0, return_map=False):
         super().__init__()
         self.color_chart_area = color_chart_area
+        self.return_map = return_map
         self.kl = 1
         self.kc = 1
         self.kh = 1
@@ -163,6 +164,7 @@ class deltaE00():
         img2 = color.rgb2lab(img2)
 
         # reshape to 1D array
+        img_shape = img1.shape
         img1 = img1.reshape(-1, 3).astype(np.float32)
         img2 = img2.reshape(-1, 3).astype(np.float32)
 
@@ -218,6 +220,11 @@ class deltaE00():
         khSh = self.kh * Sh
         de00 = np.sqrt(np.power((dL / klSl), 2) + np.power((dC / kcSc), 2) +
                        np.power((dH / khSh), 2) + RT * (dC / kcSc) * (dH / khSh))
+
+        if self.return_map:
+            de00_map = de00.reshape(img_shape[0], img_shape[1])
+            de00_value = np.sum(de00) / (np.shape(de00)[0] - self.color_chart_area)
+            return de00_map, de00_value
 
         return np.sum(de00) / (np.shape(de00)[0] - self.color_chart_area)
 
