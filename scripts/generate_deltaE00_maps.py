@@ -7,6 +7,7 @@ import torch
 import argparse
 import os
 import matplotlib.pyplot as plt
+import numpy as np
 
 from PIL import Image
 from basicsr.metrics.deltaE_lpips import deltaE00
@@ -19,11 +20,12 @@ def find_image_path(directory, image_name):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_names', type=str, default=['PromptIR_FiveK_baseline_official_split_1', 'Restormer_FiveK_baseline_official_split_2', 'NamedCurves'])
-    parser.add_argument('--image_name', type=str, default='a4687')
+    # parser.add_argument('--model_names', type=str, default=['Restormer_FiveK_baseline_official_split_2', 'RCNBackbone_pre_unf_FiveK_official_split_1', 'PromptIR_FiveK_baseline_official_split_1','PIRCNBackbone_pre_unf_FiveK_official_split_2'])
+    parser.add_argument('--model_names', type=str, default=['AdaInt', 'NamedCurves', 'RCNBackbone_pre_unf_FiveK_official_split_1','PIRCNBackbone_pre_unf_FiveK_official_split_2'])  # ['Restormer_FiveK_baseline_official_split_2', 'RCNBackbone_pre_unf_FiveK_official_split_1', 'PromptIR_FiveK_baseline_official_split_1','PIRCNBackbone_pre_unf_FiveK_official_split_2'])
+    parser.add_argument('--image_name', type=str, default='a4768')
     parser.add_argument('--output_dir', type=str, default='deltaE00_maps')
     args = parser.parse_args()
-
+    value = 30
     # Create output directory
     # output_dir = os.path.join(args.output_dir, args.model_name)
     # os.makedirs(output_dir, exist_ok=True)
@@ -66,10 +68,22 @@ def main():
     # At the end of the plot, we are going to put a colorbar to show the deltaE00 values. This colorbar is going to be shared between all the deltaE00 maps.
     # All images are together, without any separation between them, no white space between images.
     # Only the columns where the deltaE00 maps are going to be plotted are going to have a title, the name of the model.
+    print(f'DeltaE00 values: {deltaE00_values}')
     aspect_ratio = input_img.size[1] / input_img.size[0]
     rows = 2
     cols = 1 + len(args.model_names)
 
+    # All values above 20 are going to be clipped to 20, as the deltaE00 values are usually below 20.
+
+    if value is not None:
+        for deltaE00_map in deltaE00_maps:
+            deltaE00_map[deltaE00_map > value] = value
+        # Set a maximum value of 20 for the colorbar, as the deltaE00 values are usually below 20.
+        top_value = value
+    else:
+        max_value = max([map.max() for map in deltaE00_maps])
+        top_value = np.ceil(max_value / 5) * 5
+    norm = plt.Normalize(vmin=0, vmax=top_value)
     subplot_width = 5
 
     fig_width = subplot_width * cols
@@ -83,14 +97,13 @@ def main():
     for i, (pred_img, deltaE00_map) in enumerate(zip(pred_img_list, deltaE00_maps)):
         axs[0, i + 1].imshow(pred_img)
         axs[0, i + 1].axis('off')
-        axs[1, i + 1].imshow(deltaE00_map)
+        cax = axs[1, i + 1].imshow(deltaE00_map, norm=norm)
         axs[1, i + 1].axis('off')
     # No white space between rows
     plt.subplots_adjust(wspace=0, hspace=0)
+    fig.colorbar(cax, ax=axs, orientation='vertical', fraction=0.05, pad=0.05)
     # Add colorbar as an extra column at the end, with the height of one column (2 images on top of each other), and so
     # the colorbar is going to be shared between all the deltaE00 maps.
-    cax = fig.add_axes([0.93, 0.1, 0.02, 0.8])
-    fig.colorbar(axs[1, 1].imshow(deltaE00_maps[0]), cax=cax)
     # Add a title to the columns where the deltaE00 maps are plotted, leaving enough space between them and the images.
     axs[0, 0].set_title(f'Input {args.image_name}', pad=30)
     for i, model_name in enumerate(args.model_names):

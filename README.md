@@ -40,7 +40,7 @@ mechanism.
 
 ![RCN Model](./images/restormer-cn.png)
 
-### PromptIR with Color Naming (PCN)
+### PromptIR with Color Naming (PIRCN)
 
 PromptIR is a variant of Restormer that includes a prompt block 
 designed to incorporate additional information about image degradation.
@@ -53,7 +53,7 @@ The MDTA module is also modified in the same four ways as in the RCN,
 and we also modified the prompt block to include the color naming
 information. 
 
-![PCN Model](./images/promptir-cn.png)
+![PIRCN Model](./images/promptir-cn.png)
 
 ## Data
 
