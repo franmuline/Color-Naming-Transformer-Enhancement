@@ -232,7 +232,7 @@ class deltaE00():
 class LPIPS():
     def __init__(self):
         super().__init__()
-        self.lpips = lpips.LPIPS(net='alex', verbose=False)
+        self.lpips = lpips.LPIPS(net='vgg', verbose=False)
 
     def __call__(self, img1, img2):
         """ Compute the LPIPS between two numpy RGB images
@@ -257,7 +257,7 @@ class LPIPS():
 if __name__ == '__main__':
     # Test the metrics
     img1 = "/home/franmuline/Master_Workspace/TFM/Datasets/FiveK/input/a0001-jmac_DSC1459.png"
-    img2 = "/home/franmuline/Master_Workspace/TFM/Datasets/FiveK/input/a0001-jmac_DSC1459.png"
+    img2 = "/home/franmuline/Master_Workspace/TFM/Datasets/FiveK/expertC_gt/a0001-jmac_DSC1459.png"
 
     img1 = cv2.imread(img1)
     img2 = cv2.imread(img2)
