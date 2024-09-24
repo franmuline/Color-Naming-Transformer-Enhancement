@@ -20,7 +20,8 @@ in the Master thesis titled **"Image Enhancement using Color Naming in
 Transformer-Based Models"**. The project integrates color naming 
 probability maps into transformer-based models, Restormer and PromptIR,
 to enhance the process of image retouching, focusing on replicating 
-expert adjustments in color accuracy and overall visual quality.
+expert adjustments in color accuracy and overall visual quality. The 
+report can be found [here](assets/Image%20Enhancement%20using%20Color%20Naming%20in%20Transformer-Based%20Models.pdf).
 
 ## Methods 
 
@@ -38,7 +39,7 @@ is modified in four different ways, (a), (b), (c), and (d) in the
 image below, to include the color naming information in the attention
 mechanism.
 
-![RCN Model](./images/restormer-cn.png)
+![RCN Model](assets/restormer-cn.png)
 
 ### PromptIR with Color Naming (PIRCN)
 
@@ -53,7 +54,7 @@ The MDTA module is also modified in the same four ways as in the RCN,
 and we also modified the prompt block to include the color naming
 information. 
 
-![PIRCN Model](./images/promptir-cn.png)
+![PIRCN Model](assets/promptir-cn.png)
 
 ## Data
 
